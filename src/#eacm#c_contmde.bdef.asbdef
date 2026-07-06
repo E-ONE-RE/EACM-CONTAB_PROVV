@@ -1,0 +1,10 @@
+projection;
+strict ( 2 );
+
+define behavior for /EACM/C_CONTMDE //alias <alias_name>
+{
+//  use create;
+//  use update;
+//  use delete;
+  use action PostMde;
+}

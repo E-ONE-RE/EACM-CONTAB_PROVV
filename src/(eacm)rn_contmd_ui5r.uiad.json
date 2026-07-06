@@ -1,0 +1,34 @@
+{
+  "formatVersion": "2",
+  "header": {
+    "description": "Contabilizzazione Maturande",
+    "originalLanguage": "en",
+    "abapLanguageVersion": "cloudDevelopment"
+  },
+  "generalInformation": {
+    "appType": "ui5",
+    "catalogId": "SAP_TC_UI5_REPO_UIAD",
+    "targetMappingTitle": "Contabilizzazione Maturande"
+  },
+  "ui5AppDetails": {
+    "appId": "zpd_contmde"
+  },
+  "navigation": {
+    "targetMappingId": "/EACM/RN_CONTMD_UI5R_TM",
+    "semanticObject": "ZFL_CONTMDE",
+    "action": "display",
+    "desktop": true,
+    "tablet": true,
+    "phone": true
+  },
+  "tiles": [
+    {
+      "id": "/EACM/RN_CONTMD_UI5R_AL",
+      "tileType": "static",
+      "isDefault": true,
+      "standard": {
+        "title": "Contabilizzazione Maturande"
+      }
+    }
+  ]
+}

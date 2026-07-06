@@ -1,0 +1,6 @@
+@EndUserText.label: '/EACM/C_CONTMDE'
+@MappingRole: true
+define role /EACM/C_CONTMDE {
+  grant select on /EACM/C_CONTMDE
+  where INHERITING CONDITIONS FROM ENTITY /EACM/I_CONTMDE REPLACING { ROOT WITH _BaseEntity };
+}

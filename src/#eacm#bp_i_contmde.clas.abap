@@ -1,0 +1,5 @@
+CLASS /eacm/bp_i_contmde DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF /eacm/i_contmde.
+ENDCLASS.
+
+CLASS /eacm/bp_i_contmde IMPLEMENTATION.
+ENDCLASS.

@@ -1,0 +1,11 @@
+unmanaged implementation in class /eacm/bp_i_contmde unique;
+strict ( 2 );
+define behavior for /EACM/I_CONTMDE
+lock master
+authorization master ( global )
+{
+  field ( readonly ) CompanyCode, SalesOrganization, DistributionChannel, CommissionClass, BillingDocument, BillingDocumentItem, Agent, AgentProgressive;
+  static action PostMde
+    parameter /eacm/a_mde_post_input
+    result [1] /eacm/a_mde_action_result;
+}

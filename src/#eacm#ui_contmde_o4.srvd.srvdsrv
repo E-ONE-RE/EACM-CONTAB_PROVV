@@ -1,0 +1,11 @@
+@EndUserText: {
+  label: 'Service Definition for /EACM/C_CONTMDE'
+}
+@ObjectModel: {
+  leadingEntity: {
+    name: '/EACM/C_CONTMDE'
+  }
+}
+define service /EACM/UI_CONTMDE_O4 provider contracts odata_v4_ui {
+  expose /EACM/C_CONTMDE;
+}

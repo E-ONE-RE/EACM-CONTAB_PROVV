@@ -1,0 +1,14 @@
+unmanaged implementation in class /eacm/bp_i_contmte unique;
+strict ( 2 );
+
+define behavior for /EACM/I_CONTMTE //alias <alias_name>
+lock master
+authorization master ( global )
+//etag master <field_name>
+{
+  field ( readonly ) CompanyCode, SalesOrganization, DistributionChannel, CommissionClass, BillingDocument, BillingDocumentItem, Agent, AgentProgressive, FacsimileProgressive, FacsimilePeriod;
+static action PostMte
+  parameter /eacm/a_mte_post_input
+  result [1] /eacm/a_mde_action_result;
+
+}

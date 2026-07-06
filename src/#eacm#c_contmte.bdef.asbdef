@@ -1,0 +1,8 @@
+projection;
+strict ( 2 );
+
+define behavior for /EACM/C_CONTMTE //alias <alias_name>
+{
+
+  use action PostMte;
+}

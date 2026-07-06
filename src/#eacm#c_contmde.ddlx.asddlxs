@@ -1,0 +1,198 @@
+@Metadata.layer: #CORE
+@UI.headerInfo.title.type: #STANDARD
+@UI.headerInfo.title.value: 'CompanyCode'
+@UI.headerInfo.description.type: #STANDARD
+@UI.headerInfo.description.value: 'CompanyCode'
+
+annotate view /EACM/C_CONTMDE with
+{
+  @UI.facet: [ {
+    label: 'General Information', 
+    id: 'GeneralInfo', 
+    purpose: #STANDARD, 
+    position: 10 , 
+    type: #IDENTIFICATION_REFERENCE
+  } ]
+  @UI.identification: [ {
+    position: 10 
+  } ]
+
+
+@UI.lineItem: [{ type: #FOR_ACTION, dataAction: 'PostMde', label: 'Contabilizza MDE' },
+{ position: 10 }]
+//@UI.identification: [{ type: #FOR_ACTION, dataAction: 'PostMde', label: 'Contabilizza MDE' }]
+
+  @UI.selectionField: [ {
+    position: 10 
+  } ]
+    @Consumption.valueHelpDefinition: [ {
+      entity: { name: '/EACM/R_T001', element: 'Bukrs' }
+          } ]
+  CompanyCode;
+  
+//  Default: visualizza quelle contabilizzate oggi
+  @UI.selectionField: [ {
+    position: 15 
+  } ]
+  @Consumption.filter.defaultValue: 'X'
+  IsToday;
+  
+  @UI.identification: [ {
+    position: 20 
+  } ]
+  @UI.lineItem: [ {
+    position: 20 
+  } ]
+  @UI.selectionField: [ {
+    position: 20 
+  } ]
+    @Consumption.valueHelpDefinition: [ {
+      entity: { name: '/EACM/I_TVKO', element: 'Vkorg' }
+    } ]
+  SalesOrganization;
+  
+  @UI.identification: [ {
+    position: 30 
+  } ]
+  @UI.lineItem: [ {
+    position: 30 
+  } ]
+  DistributionChannel;
+  
+  @UI.identification: [ {
+    position: 40 
+  } ]
+  @UI.lineItem: [ {
+    position: 40 
+  } ]
+
+  CommissionClass;
+  
+  @UI.identification: [ {
+    position: 50 
+  } ]
+  @UI.lineItem: [ {
+    position: 50 
+  } ]
+  @UI.selectionField: [ {
+    position: 50 
+  } ]
+  BillingDocument;
+  
+  @UI.identification: [ {
+    position: 60 
+  } ]
+  @UI.lineItem: [ {
+    position: 60 
+  } ]
+  @UI.selectionField: [ {
+    position: 60 
+  } ]
+  BillingDocumentItem;
+  
+  @UI.identification: [ {
+    position: 70 
+  } ]
+  @UI.lineItem: [ {
+    position: 70 
+  } ]
+  @UI.selectionField: [ {
+    position: 70 
+  } ]
+  @Consumption.valueHelpDefinition: [ {
+    entity: { name: '/EACM/I_ZPRAA', element: 'Zcdaz' }
+  } ]
+  Agent;
+  
+  @UI.identification: [ {
+    position: 80 
+  } ]
+  @UI.lineItem: [ {
+    position: 80 
+  } ]
+
+  AgentProgressive;
+  
+  @UI.identification: [ {
+    position: 90 
+  } ]
+  @UI.lineItem: [ {
+    position: 90 
+  } ]
+  @UI.selectionField: [ {
+    position: 90 
+  } ]
+  BillingDocumentDate;
+  
+  @UI.identification: [ {
+    position: 100 
+  } ]
+  @UI.lineItem: [ {
+    position: 100 
+  } ]
+  @UI.selectionField: [ {
+    position: 100 
+  } ]
+
+
+  PostingDate;
+  
+  @UI.identification: [ {
+    position: 110 
+  } ]
+  @UI.lineItem: [ {
+    position: 110 
+  } ]
+
+  AgentPaymentType;
+  
+  @UI.identification: [ {
+    position: 120 
+  } ]
+  @UI.lineItem: [ {
+    position: 120 
+  } ]
+  @UI.selectionField: [ {
+    position: 120 
+  } ]
+  SalesDocumentCategory;
+  
+  @UI.identification: [ {
+    position: 130 
+  } ]
+  @UI.lineItem: [ {
+    position: 130 
+  } ]
+
+  ExchangeRate;
+  
+  @UI.identification: [ {
+    position: 140 
+  } ]
+  @UI.lineItem: [ {
+    position: 140 
+  } ]
+
+  AccrualAmountOriginal;
+  
+  @UI.identification: [ {
+    position: 150 
+  } ]
+  @UI.lineItem: [ {
+    position: 150 
+  } ]
+
+  DocumentSign;
+  
+  @EndUserText.label: 'AccrualAmountSigned'
+  @UI.identification: [ {
+    position: 160 , 
+    label: 'AccrualAmountSigned'
+  } ]
+  @UI.lineItem: [ {
+    position: 160 , 
+    label: 'AccrualAmountSigned'
+  } ]
+
+  AccrualAmountSigned;
+}
