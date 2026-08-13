@@ -27,6 +27,9 @@ CLASS lhc_I_CONTMTE IMPLEMENTATION.
 
 METHOD PostMte.
   DATA(lo_posting) = NEW /eacm/cl_mte_posting( ).
+  DATA lv_enqueued_total TYPE i.
+
+  /eacm/cl_mte_posting_request=>clear_pending( ).
 
   LOOP AT keys ASSIGNING FIELD-SYMBOL(<key>).
     DATA(ls_selection) = VALUE /eacm/cl_mte_posting=>ty_selection(
@@ -39,7 +42,8 @@ METHOD PostMte.
       assignment_reference     = <key>-%param-AssignmentReference
       text_rule                = <key>-%param-TextRule
       item_text                = <key>-%param-ItemText
-      use_document_date_rate   = <key>-%param-UseDocumentDateRate ).
+      use_document_date_rate   = <key>-%param-UseDocumentDateRate
+      defer_status_update      = abap_true ).
 
     IF <key>-%param-AgentFrom IS NOT INITIAL
        OR <key>-%param-AgentTo IS NOT INITIAL.
@@ -93,6 +97,52 @@ METHOD PostMte.
         option = COND #( WHEN <key>-%param-FacsimilePeriodTo IS INITIAL THEN 'EQ' ELSE 'BT' )
         low    = <key>-%param-FacsimilePeriodFrom
         high   = <key>-%param-FacsimilePeriodTo ) TO ls_selection-facsimile_period_range.
+    ENDIF.
+
+    IF ls_selection-test_run <> abap_true.
+      TRY.
+          DATA(lv_enqueued_count) = /eacm/cl_mte_posting_request=>enqueue( ls_selection ).
+          lv_enqueued_total += lv_enqueued_count.
+
+          DATA(lv_queue_message) = COND string(
+            WHEN lv_enqueued_count > 0
+            THEN |Richieste MTE accodate: { lv_enqueued_count }. Il job verra pianificato al salvataggio.|
+            ELSE 'Nessuna richiesta MTE accodata: righe gia contabilizzate o gia in elaborazione.' ).
+
+          APPEND VALUE #(
+            %cid = <key>-%cid
+            %msg = new_message_with_text(
+              severity = if_abap_behv_message=>severity-information
+              text     = lv_queue_message ) ) TO reported-/eacm/i_contmte.
+
+          APPEND VALUE #(
+            %cid = <key>-%cid
+            %param = VALUE #(
+              Preview      = abap_false
+              MessageType  = 'S'
+              MessageText  = lv_queue_message
+              PostedRows   = 0
+              ErrorCount   = 0
+              WarningCount = 0 ) ) TO result.
+
+        CATCH cx_root INTO DATA(lx_enqueue).
+          APPEND VALUE #( %cid = <key>-%cid ) TO failed-/eacm/i_contmte.
+          APPEND VALUE #(
+            %cid = <key>-%cid
+            %msg = new_message_with_text(
+              severity = if_abap_behv_message=>severity-error
+              text     = lx_enqueue->get_text( ) ) ) TO reported-/eacm/i_contmte.
+          APPEND VALUE #(
+            %cid = <key>-%cid
+            %param = VALUE #(
+              Preview      = abap_false
+              MessageType  = 'E'
+              MessageText  = lx_enqueue->get_text( )
+              PostedRows   = 0
+              ErrorCount   = 1
+              WarningCount = 0 ) ) TO result.
+      ENDTRY.
+      CONTINUE.
     ENDIF.
 
     DATA lt_posting_result TYPE /eacm/cl_mte_posting=>tt_result.
@@ -164,6 +214,14 @@ METHOD PostMte.
         ErrorCount   = lv_error_count
         WarningCount = lv_warning_count ) ) TO result.
   ENDLOOP.
+
+  IF lv_enqueued_total > 0.
+    APPEND VALUE #(
+      %msg = new_message_with_text(
+        severity = if_abap_behv_message=>severity-information
+        text     = |Application Job MTE pianificato tra 30 secondi al salvataggio. Richieste totali: { lv_enqueued_total }.| ) )
+      TO reported-/eacm/i_contmte.
+  ENDIF.
 ENDMETHOD.
 
 
@@ -193,6 +251,7 @@ CLASS lsc_I_CONTMTE IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD save.
+    /eacm/cl_mte_posting_request=>save_pending( ).
   ENDMETHOD.
 
   METHOD cleanup.
@@ -202,3 +261,4 @@ CLASS lsc_I_CONTMTE IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

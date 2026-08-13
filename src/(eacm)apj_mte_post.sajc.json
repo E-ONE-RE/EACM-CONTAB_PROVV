@@ -1,0 +1,16 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "APJ_MTE_POST",
+    "originalLanguage": "en",
+    "abapLanguageVersion": "cloudDevelopment"
+  },
+  "generalInformation": {
+    "className": "/EACM/CL_MTE_POSTING_APJ"
+  },
+  "parameters": [
+    {
+      "name": "P_MAX"
+    }
+  ]
+}

@@ -24,6 +24,7 @@ CLASS /eacm/cl_mte_posting DEFINITION
         item_text                TYPE c LENGTH 50,
         use_document_date_rate   TYPE abap_bool,
         defer_status_update      TYPE abap_bool,
+        external_reference       TYPE xblnr,
         agent_range              TYPE tt_agent_range,
         payment_type_range       TYPE tt_payment_type_range,
         sales_org_range          TYPE tt_sales_org_range,
@@ -49,6 +50,26 @@ CLASS /eacm/cl_mte_posting DEFINITION
 
     METHODS run
       IMPORTING is_selection TYPE ty_selection
+      RETURNING VALUE(rt_result) TYPE tt_result.
+
+    METHODS enqueue_status_requests
+      IMPORTING is_selection TYPE ty_selection
+      RETURNING VALUE(rv_count) TYPE i
+      RAISING /eacm/cx_eacm_posting.
+
+    METHODS count_status_requests
+      IMPORTING is_selection TYPE ty_selection
+      RETURNING VALUE(rv_count) TYPE i
+      RAISING /eacm/cx_eacm_posting.
+
+    METHODS update_status_schedule_message
+      IMPORTING
+        is_selection TYPE ty_selection
+        iv_message   TYPE string
+        iv_status    TYPE /eacm/job_mte-status OPTIONAL.
+
+    METHODS process_status
+      IMPORTING is_status TYPE /eacm/job_mte
       RETURNING VALUE(rt_result) TYPE tt_result.
 
   PRIVATE SECTION.
@@ -112,6 +133,13 @@ CLASS /eacm/cl_mte_posting DEFINITION
         source_rows             TYPE tt_zprdp,
       END OF ty_group,
       tt_group TYPE STANDARD TABLE OF ty_group WITH EMPTY KEY.
+
+    TYPES:
+      BEGIN OF ty_existing_document,
+        exists              TYPE abap_bool,
+        accounting_document TYPE belnr_d,
+        fiscal_year         TYPE gjahr,
+      END OF ty_existing_document.
 
     CONSTANTS:
       gc_msg_error     TYPE symsgty VALUE 'E',
@@ -216,6 +244,61 @@ CLASS /eacm/cl_mte_posting DEFINITION
       IMPORTING
         is_selection TYPE ty_selection
         is_group     TYPE ty_group.
+
+    METHODS build_status_from_group
+      IMPORTING
+        iv_job_uuid  TYPE sysuuid_x16
+        is_selection TYPE ty_selection
+        is_group     TYPE ty_group
+      RETURNING VALUE(rs_status) TYPE /eacm/job_mte
+      RAISING /eacm/cx_eacm_posting.
+
+    METHODS save_group_sources
+      IMPORTING
+        iv_job_uuid TYPE sysuuid_x16
+        is_group    TYPE ty_group
+      RAISING /eacm/cx_eacm_posting.
+
+    METHODS find_group_job
+      IMPORTING is_group TYPE ty_group
+      RETURNING VALUE(rv_job_uuid) TYPE sysuuid_x16.
+
+    METHODS build_group_from_status
+      IMPORTING is_status TYPE /eacm/job_mte
+      RETURNING VALUE(rs_group) TYPE ty_group.
+
+    METHODS mark_status_in_process
+      IMPORTING is_status TYPE /eacm/job_mte.
+
+    METHODS mark_status_accounted
+      IMPORTING
+        is_status              TYPE /eacm/job_mte
+        iv_message             TYPE string
+        iv_accounting_document TYPE belnr_d OPTIONAL
+        iv_fiscal_year         TYPE gjahr OPTIONAL.
+
+    METHODS mark_status_error
+      IMPORTING
+        is_status  TYPE /eacm/job_mte
+        iv_message TYPE string.
+
+    METHODS mark_source_rows_posted
+      IMPORTING is_status TYPE /eacm/job_mte.
+
+    METHODS recover_in_process_status
+      IMPORTING is_status TYPE /eacm/job_mte
+      RETURNING VALUE(rv_recovered) TYPE abap_bool.
+
+    METHODS read_existing_document
+      IMPORTING
+        iv_bukrs TYPE bukrs
+        iv_gjahr TYPE gjahr
+        iv_xblnr TYPE xblnr
+      RETURNING VALUE(rs_document) TYPE ty_existing_document.
+
+    METHODS build_error_message
+      IMPORTING it_result TYPE tt_result
+      RETURNING VALUE(rv_message) TYPE string.
 
     METHODS append_message
       IMPORTING
@@ -922,9 +1005,12 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       document_date               = is_selection-document_date
       posting_date                = is_selection-posting_date
       accounting_document_type    = lv_blart
-      original_reference_document = COND #( WHEN is_group-assignment_number IS INITIAL
-                                            THEN is_group-agent
-                                            ELSE is_group-assignment_number )
+      original_reference_document = COND #(
+        WHEN is_selection-external_reference IS NOT INITIAL
+        THEN is_selection-external_reference
+        WHEN is_group-assignment_number IS INITIAL
+        THEN is_group-agent
+        ELSE is_group-assignment_number )
       document_header_text        = 'Contabilizzazione MTE'
       created_by_user             = cl_abap_context_info=>get_user_technical_name( ) ).
 
@@ -1013,6 +1099,539 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       agent = iv_agent ) TO ct_result.
   ENDMETHOD.
 
+
+  METHOD enqueue_status_requests.
+    DATA lt_result TYPE tt_result.
+    DATA lv_now TYPE /eacm/job_mte-changed_at.
+    DATA lv_exists TYPE abap_bool.
+
+    IF is_selection-test_run = abap_true.
+      RETURN.
+    ENDIF.
+
+    IF validate(
+         EXPORTING is_selection = is_selection
+         CHANGING  ct_result    = lt_result ) = abap_false.
+      RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+        EXPORTING iv_text = build_error_message( lt_result ).
+    ENDIF.
+
+    DATA(ls_config) = load_config(
+      EXPORTING is_selection = is_selection
+      CHANGING  ct_result    = lt_result ).
+
+    DATA(lt_groups) = collect_to_post(
+      EXPORTING
+        is_selection = is_selection
+        is_config    = ls_config
+      CHANGING
+        ct_result    = lt_result ).
+
+    IF line_exists( lt_result[ type = 'E' ] )
+       OR line_exists( lt_result[ type = 'A' ] )
+       OR line_exists( lt_result[ type = 'X' ] ).
+      RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+        EXPORTING iv_text = build_error_message( lt_result ).
+    ENDIF.
+
+    GET TIME STAMP FIELD lv_now.
+
+    LOOP AT lt_groups INTO DATA(ls_group).
+      DATA(lv_job_uuid) = find_group_job( ls_group ).
+
+      IF lv_job_uuid IS NOT INITIAL.
+        SELECT SINGLE status
+          FROM /eacm/job_mte
+          WHERE job_uuid = @lv_job_uuid
+          INTO @DATA(lv_status).
+
+        IF lv_status = 'I' OR lv_status = 'W' OR lv_status = 'C'.
+          CONTINUE.
+        ENDIF.
+      ELSE.
+        TRY.
+            lv_job_uuid = cl_system_uuid=>create_uuid_x16_static( ).
+          CATCH cx_uuid_error INTO DATA(lx_uuid).
+            RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+              EXPORTING iv_text = lx_uuid->get_text( ).
+        ENDTRY.
+      ENDIF.
+
+      DATA(ls_status) = build_status_from_group(
+        iv_job_uuid  = lv_job_uuid
+        is_selection = is_selection
+        is_group     = ls_group ).
+
+      CLEAR lv_exists.
+      SELECT SINGLE @abap_true
+        FROM /eacm/job_mte
+        WHERE job_uuid = @lv_job_uuid
+        INTO @lv_exists.
+
+      IF lv_exists = abap_true.
+        ls_status-changed_by = sy-uname.
+        ls_status-changed_at = lv_now.
+        ls_status-last_message = 'Richiesta MTE pronta per contabilizzazione'.
+
+        UPDATE /eacm/job_mte
+          SET status               = 'I',
+              bldat                = @ls_status-bldat,
+              budat                = @ls_status-budat,
+              blart                = @ls_status-blart,
+              use_doc_rate         = @ls_status-use_doc_rate,
+              assignment_rule      = @ls_status-assignment_rule,
+              assignment_reference = @ls_status-assignment_reference,
+              text_rule            = @ls_status-text_rule,
+              item_text            = @ls_status-item_text,
+              amount               = @ls_status-amount,
+              source_count         = @ls_status-source_count,
+              belnr                = '',
+              belnr_gjahr          = '',
+              changed_by           = @sy-uname,
+              changed_at           = @lv_now,
+              last_message         = @ls_status-last_message
+          WHERE job_uuid = @lv_job_uuid.
+
+        " Ricostruisce il dettaglio in caso di retry E, per recepire eventuali
+        " variazioni di configurazione o raggruppamento intervenute nel frattempo.
+        DELETE FROM /eacm/job_mtesrc
+          WHERE job_uuid = @lv_job_uuid.
+      ELSE.
+        ls_status-created_by = sy-uname.
+        ls_status-created_at = lv_now.
+        ls_status-changed_by = sy-uname.
+        ls_status-changed_at = lv_now.
+        ls_status-last_message = 'Richiesta MTE pronta per contabilizzazione'.
+        INSERT /eacm/job_mte FROM @ls_status.
+      ENDIF.
+
+      save_group_sources(
+        iv_job_uuid = lv_job_uuid
+        is_group    = ls_group ).
+      rv_count += 1.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD count_status_requests.
+    DATA lt_result TYPE tt_result.
+
+    IF is_selection-test_run = abap_true.
+      RETURN.
+    ENDIF.
+
+    IF validate(
+         EXPORTING is_selection = is_selection
+         CHANGING  ct_result    = lt_result ) = abap_false.
+      RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+        EXPORTING iv_text = build_error_message( lt_result ).
+    ENDIF.
+
+    DATA(ls_config) = load_config(
+      EXPORTING is_selection = is_selection
+      CHANGING  ct_result    = lt_result ).
+    DATA(lt_groups) = collect_to_post(
+      EXPORTING
+        is_selection = is_selection
+        is_config    = ls_config
+      CHANGING
+        ct_result    = lt_result ).
+
+    IF line_exists( lt_result[ type = 'E' ] )
+       OR line_exists( lt_result[ type = 'A' ] )
+       OR line_exists( lt_result[ type = 'X' ] ).
+      RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+        EXPORTING iv_text = build_error_message( lt_result ).
+    ENDIF.
+
+    LOOP AT lt_groups INTO DATA(ls_group).
+      DATA(lv_job_uuid) = find_group_job( ls_group ).
+      IF lv_job_uuid IS NOT INITIAL.
+        SELECT SINGLE status
+          FROM /eacm/job_mte
+          WHERE job_uuid = @lv_job_uuid
+          INTO @DATA(lv_status).
+        IF lv_status = 'I' OR lv_status = 'W' OR lv_status = 'C'.
+          CONTINUE.
+        ENDIF.
+      ENDIF.
+      rv_count += 1.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD update_status_schedule_message.
+    DATA lv_now TYPE /eacm/job_mte-changed_at.
+    DATA lv_has_agent_range TYPE abap_bool.
+    DATA lv_has_sales_org_range TYPE abap_bool.
+
+    lv_has_agent_range = xsdbool( is_selection-agent_range IS NOT INITIAL ).
+    lv_has_sales_org_range = xsdbool( is_selection-sales_org_range IS NOT INITIAL ).
+    GET TIME STAMP FIELD lv_now.
+
+    IF iv_status IS INITIAL.
+      UPDATE /eacm/job_mte
+        SET changed_by   = @sy-uname,
+            changed_at   = @lv_now,
+            last_message = @iv_message
+        WHERE bukrs = @is_selection-company_code
+          AND ( @lv_has_agent_range = @abap_false OR zcdaz IN @is_selection-agent_range )
+          AND ( @lv_has_sales_org_range = @abap_false OR vkorg IN @is_selection-sales_org_range )
+          AND status <> 'C'.
+    ELSE.
+      UPDATE /eacm/job_mte
+        SET status       = @iv_status,
+            changed_by   = @sy-uname,
+            changed_at   = @lv_now,
+            last_message = @iv_message
+        WHERE bukrs = @is_selection-company_code
+          AND ( @lv_has_agent_range = @abap_false OR zcdaz IN @is_selection-agent_range )
+          AND ( @lv_has_sales_org_range = @abap_false OR vkorg IN @is_selection-sales_org_range )
+          AND status <> 'C'.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD process_status.
+    IF is_status-status = 'C'.
+      RETURN.
+    ENDIF.
+
+    IF is_status-status = 'W'
+       AND recover_in_process_status( is_status ) = abap_true.
+      RETURN.
+    ENDIF.
+
+    mark_status_in_process( is_status ).
+    COMMIT WORK AND WAIT.
+
+    DATA(ls_selection) = VALUE ty_selection(
+      company_code             = is_status-bukrs
+      document_date            = is_status-bldat
+      posting_date             = is_status-budat
+      accounting_document_type = is_status-blart
+      assignment_rule          = is_status-assignment_rule
+      assignment_reference     = is_status-assignment_reference
+      text_rule                = is_status-text_rule
+      item_text                = is_status-item_text
+      use_document_date_rate   = is_status-use_doc_rate
+      external_reference       = is_status-xblnr
+      defer_status_update      = abap_true ).
+
+    DATA(ls_group) = build_group_from_status( is_status ).
+    IF ls_group-source_rows IS INITIAL.
+      mark_status_error(
+        is_status  = is_status
+        iv_message = 'Nessuna riga sorgente MTE collegata alla richiesta.' ).
+      COMMIT WORK AND WAIT.
+      RETURN.
+    ENDIF.
+
+    TRY.
+        IF post_group(
+             EXPORTING
+               is_selection = ls_selection
+               is_group     = ls_group
+             CHANGING
+               ct_result    = rt_result ) = abap_true.
+          READ TABLE rt_result INTO DATA(ls_success) WITH KEY success = abap_true.
+          mark_status_accounted(
+            is_status              = is_status
+            iv_message             = ls_success-message_text
+            iv_accounting_document = ls_success-accounting_document
+            iv_fiscal_year         = ls_success-fiscal_year ).
+        ELSE.
+          mark_status_error(
+            is_status  = is_status
+            iv_message = build_error_message( rt_result ) ).
+        ENDIF.
+      CATCH cx_root INTO DATA(lx_error).
+        mark_status_error(
+          is_status  = is_status
+          iv_message = lx_error->get_text( ) ).
+    ENDTRY.
+
+    /eacm/cl_api_log=>flush( ).
+    COMMIT WORK AND WAIT.
+  ENDMETHOD.
+
+
+  METHOD build_status_from_group.
+    DATA lv_uuid_c32 TYPE sysuuid_c32.
+
+    TRY.
+        cl_system_uuid=>convert_uuid_x16_static(
+          EXPORTING uuid     = iv_job_uuid
+          IMPORTING uuid_c32 = lv_uuid_c32 ).
+      CATCH cx_uuid_error INTO DATA(lx_uuid).
+        RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+          EXPORTING iv_text = lx_uuid->get_text( ).
+    ENDTRY.
+
+    rs_status = VALUE #(
+      job_uuid              = iv_job_uuid
+      status                = 'I'
+      bukrs                 = is_group-company_code
+      vkorg                 = is_group-sales_org
+      vtweg                 = is_group-distribution_chan
+      zclpr                 = is_group-commission_class
+      zcdaz                 = is_group-agent
+      ztpag                 = is_group-payment_type
+      waers                 = is_group-currency
+      lifnr                 = is_group-supplier
+      zamcf                 = is_group-facsimile_period
+      zidfs                 = is_group-facsimile_progressive
+      bldat                 = is_selection-document_date
+      budat                 = is_selection-posting_date
+      blart                 = COND #( WHEN is_selection-accounting_document_type IS INITIAL
+                                      THEN gc_default_blart
+                                      ELSE is_selection-accounting_document_type )
+      use_doc_rate          = is_selection-use_document_date_rate
+      assignment_rule       = is_selection-assignment_rule
+      assignment_reference  = is_group-assignment_number
+      text_rule             = is_selection-text_rule
+      item_text             = is_group-item_text
+      business_area         = is_group-business_area
+      cost_center           = is_group-assignment-cost_center
+      order_number          = is_group-assignment-order_number
+      profit_center         = is_group-assignment-profit_center
+      accrual_account       = is_group-accounts-accrual_account
+      maturity_account      = is_group-accounts-maturity_account
+      amount                = is_group-amount
+      source_count          = lines( is_group-source_rows )
+      xblnr                 = lv_uuid_c32(16)
+      xblnr_gjahr           = is_selection-posting_date(4) ).
+  ENDMETHOD.
+
+
+  METHOD save_group_sources.
+    DATA lv_now TYPE /eacm/job_mtesrc-created_at.
+    GET TIME STAMP FIELD lv_now.
+
+    LOOP AT is_group-source_rows INTO DATA(ls_source).
+      SELECT SINGLE job_uuid
+        FROM /eacm/job_mtesrc
+        WHERE bukrs = @ls_source-bukrs
+          AND vkorg = @ls_source-vkorg
+          AND vtweg = @ls_source-vtweg
+          AND zclpr = @ls_source-zclpr
+          AND vbeln = @ls_source-vbeln
+          AND posnr = @ls_source-posnr
+          AND zcdaz = @ls_source-zcdaz
+          AND zidag = @ls_source-zidag
+          AND zidfs = @ls_source-zidfs
+          AND zamcf = @ls_source-zamcf
+        INTO @DATA(lv_existing_job_uuid).
+
+      IF sy-subrc = 0.
+        IF lv_existing_job_uuid <> iv_job_uuid.
+          RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+            EXPORTING iv_text = |Riga MTE { ls_source-vbeln }/{ ls_source-posnr } gia assegnata a un'altra richiesta.|.
+        ENDIF.
+        CONTINUE.
+      ENDIF.
+
+      DATA(ls_source_status) = VALUE /eacm/job_mtesrc(
+        bukrs      = ls_source-bukrs
+        vkorg      = ls_source-vkorg
+        vtweg      = ls_source-vtweg
+        zclpr      = ls_source-zclpr
+        vbeln      = ls_source-vbeln
+        posnr      = ls_source-posnr
+        zcdaz      = ls_source-zcdaz
+        zidag      = ls_source-zidag
+        zidfs      = ls_source-zidfs
+        zamcf      = ls_source-zamcf
+        job_uuid   = iv_job_uuid
+        created_at = lv_now ).
+      INSERT /eacm/job_mtesrc FROM @ls_source_status.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD find_group_job.
+    READ TABLE is_group-source_rows INTO DATA(ls_source) INDEX 1.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+    SELECT SINGLE job_uuid
+      FROM /eacm/job_mtesrc
+      WHERE bukrs = @ls_source-bukrs
+        AND vkorg = @ls_source-vkorg
+        AND vtweg = @ls_source-vtweg
+        AND zclpr = @ls_source-zclpr
+        AND vbeln = @ls_source-vbeln
+        AND posnr = @ls_source-posnr
+        AND zcdaz = @ls_source-zcdaz
+        AND zidag = @ls_source-zidag
+        AND zidfs = @ls_source-zidfs
+        AND zamcf = @ls_source-zamcf
+      INTO @rv_job_uuid.
+  ENDMETHOD.
+
+
+  METHOD build_group_from_status.
+    rs_group = VALUE #(
+      company_code          = is_status-bukrs
+      sales_org             = is_status-vkorg
+      distribution_chan     = is_status-vtweg
+      commission_class      = is_status-zclpr
+      agent                 = is_status-zcdaz
+      payment_type          = is_status-ztpag
+      currency              = is_status-waers
+      supplier              = is_status-lifnr
+      facsimile_period      = is_status-zamcf
+      facsimile_progressive = is_status-zidfs
+      business_area         = is_status-business_area
+      assignment_number     = is_status-assignment_reference
+      item_text             = is_status-item_text
+      amount                = is_status-amount ).
+
+    rs_group-accounts-accrual_account = is_status-accrual_account.
+    rs_group-accounts-maturity_account = is_status-maturity_account.
+    rs_group-assignment-business_area = is_status-business_area.
+    rs_group-assignment-cost_center = is_status-cost_center.
+    rs_group-assignment-order_number = is_status-order_number.
+    rs_group-assignment-profit_center = is_status-profit_center.
+
+    SELECT *
+      FROM /eacm/job_mtesrc
+      WHERE job_uuid = @is_status-job_uuid
+      INTO TABLE @DATA(lt_source_keys).
+
+    LOOP AT lt_source_keys INTO DATA(ls_key).
+      SELECT SINGLE *
+        FROM /eacm/zprdp
+        WHERE bukrs = @ls_key-bukrs
+          AND vkorg = @ls_key-vkorg
+          AND vtweg = @ls_key-vtweg
+          AND zclpr = @ls_key-zclpr
+          AND vbeln = @ls_key-vbeln
+          AND posnr = @ls_key-posnr
+          AND zcdaz = @ls_key-zcdaz
+          AND zidag = @ls_key-zidag
+          AND zidfs = @ls_key-zidfs
+          AND zamcf = @ls_key-zamcf
+        INTO @DATA(ls_source).
+      IF sy-subrc = 0.
+        APPEND ls_source TO rs_group-source_rows.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD mark_status_in_process.
+    DATA lv_now TYPE /eacm/job_mte-changed_at.
+    GET TIME STAMP FIELD lv_now.
+    UPDATE /eacm/job_mte
+      SET status       = 'W',
+          changed_by   = @sy-uname,
+          changed_at   = @lv_now,
+          last_message = 'Contabilizzazione MTE in elaborazione'
+      WHERE job_uuid = @is_status-job_uuid.
+  ENDMETHOD.
+
+
+  METHOD mark_status_accounted.
+    DATA lv_now TYPE /eacm/job_mte-changed_at.
+    GET TIME STAMP FIELD lv_now.
+    mark_source_rows_posted( is_status ).
+    UPDATE /eacm/job_mte
+      SET status       = 'C',
+          belnr        = @iv_accounting_document,
+          belnr_gjahr  = @iv_fiscal_year,
+          changed_by   = @sy-uname,
+          changed_at   = @lv_now,
+          last_message = @iv_message
+      WHERE job_uuid = @is_status-job_uuid.
+  ENDMETHOD.
+
+
+  METHOD mark_status_error.
+    DATA lv_now TYPE /eacm/job_mte-changed_at.
+    DATA(lv_message) = iv_message.
+    IF strlen( lv_message ) > 500.
+      lv_message = substring( val = lv_message off = 0 len = 497 ) && `...`.
+    ENDIF.
+    GET TIME STAMP FIELD lv_now.
+    UPDATE /eacm/job_mte
+      SET status       = 'E',
+          changed_by   = @sy-uname,
+          changed_at   = @lv_now,
+          last_message = @lv_message
+      WHERE job_uuid = @is_status-job_uuid.
+  ENDMETHOD.
+
+
+  METHOD mark_source_rows_posted.
+    DATA(ls_group) = build_group_from_status( is_status ).
+    DATA(ls_selection) = VALUE ty_selection(
+      posting_date = is_status-budat ).
+    mark_group_posted(
+      is_selection = ls_selection
+      is_group     = ls_group ).
+  ENDMETHOD.
+
+
+  METHOD recover_in_process_status.
+    DATA(ls_document) = read_existing_document(
+      iv_bukrs = is_status-bukrs
+      iv_gjahr = is_status-xblnr_gjahr
+      iv_xblnr = is_status-xblnr ).
+
+    IF ls_document-exists = abap_true.
+      mark_status_accounted(
+        is_status              = is_status
+        iv_message             = 'Documento contabile MTE gia esistente: stato recuperato senza nuova contabilizzazione'
+        iv_accounting_document = ls_document-accounting_document
+        iv_fiscal_year         = ls_document-fiscal_year ).
+      /eacm/cl_api_log=>flush( ).
+      COMMIT WORK AND WAIT.
+      rv_recovered = abap_true.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD read_existing_document.
+    TRY.
+        DATA(lo_reader) = NEW /eacm/cl_api_acct_doc_read(
+          i_servide_id = /eacm/cl_api_acct_doc_read=>mapp_service_id ).
+        DATA(ls_map) = lo_reader->read_document_map(
+          iv_sender_logical_system      = ''
+          iv_sender_company_code        = iv_bukrs
+          iv_sender_accounting_document = iv_xblnr
+          iv_sender_fiscal_year         = |{ iv_gjahr }| ).
+        rs_document = VALUE #(
+          exists              = xsdbool( ls_map-AccountingDocument IS NOT INITIAL )
+          accounting_document = ls_map-AccountingDocument
+          fiscal_year         = ls_map-FiscalYear ).
+      CATCH /eacm/cx_api_error cx_sy_itab_line_not_found.
+        CLEAR rs_document.
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD build_error_message.
+    LOOP AT it_result INTO DATA(ls_message)
+      WHERE type = 'E'
+         OR type = 'A'
+         OR type = 'X'.
+      CHECK ls_message-message_text IS NOT INITIAL.
+      rv_message = COND #(
+        WHEN rv_message IS INITIAL
+        THEN ls_message-message_text
+        ELSE |{ rv_message }; { ls_message-message_text }| ).
+    ENDLOOP.
+
+    IF rv_message IS INITIAL.
+      rv_message = 'Contabilizzazione MTE terminata con errori.'.
+    ELSEIF strlen( rv_message ) > 500.
+      rv_message = substring( val = rv_message off = 0 len = 497 ) && `...`.
+    ENDIF.
+  ENDMETHOD.
+
 ENDCLASS.
+
 
 

@@ -1,0 +1,463 @@
+@Metadata.layer: #CORE
+@UI.headerInfo.title.type: #STANDARD
+@UI.headerInfo.title.value: 'JobUUID'
+@UI.headerInfo.description.type: #STANDARD
+@UI.headerInfo.description.value: 'JobUUID'
+annotate view /EACM/C_JOB_MTE with
+{
+  @EndUserText.label: 'JobUUID'
+  @UI.facet: [ {
+    label: 'General Information', 
+    id: 'GeneralInfo', 
+    purpose: #STANDARD, 
+    position: 10 , 
+    type: #IDENTIFICATION_REFERENCE
+  } ]
+  @UI.identification: [ {
+    position: 10 , 
+    label: 'JobUUID'
+  } ]
+  @UI.lineItem: [ {
+    position: 10 , 
+    label: 'JobUUID'
+  } ]
+  @UI.selectionField: [ {
+    position: 10 
+  } ]
+  JobUUID;
+  
+  @EndUserText.label: 'Status'
+  @UI.identification: [ {
+    position: 20 , 
+    label: 'Status'
+  } ]
+  @UI.lineItem: [ {
+    position: 20 , 
+    label: 'Status'
+  } ]
+  @UI.selectionField: [ {
+    position: 20 
+  } ]
+  Status;
+  
+  @UI.identification: [ {
+    position: 30 
+  } ]
+  @UI.lineItem: [ {
+    position: 30 
+  } ]
+  @UI.selectionField: [ {
+    position: 30 
+  } ]
+  Bukrs;
+  
+  @UI.identification: [ {
+    position: 40 
+  } ]
+  @UI.lineItem: [ {
+    position: 40 
+  } ]
+  @UI.selectionField: [ {
+    position: 40 
+  } ]
+  Vkorg;
+  
+  @UI.identification: [ {
+    position: 50 
+  } ]
+  @UI.lineItem: [ {
+    position: 50 
+  } ]
+  @UI.selectionField: [ {
+    position: 50 
+  } ]
+  Vtweg;
+  
+  @EndUserText.label: 'Zclpr'
+  @UI.identification: [ {
+    position: 60 , 
+    label: 'Zclpr'
+  } ]
+  @UI.lineItem: [ {
+    position: 60 , 
+    label: 'Zclpr'
+  } ]
+  @UI.selectionField: [ {
+    position: 60 
+  } ]
+  Zclpr;
+  
+  @UI.identification: [ {
+    position: 70 
+  } ]
+  @UI.lineItem: [ {
+    position: 70 
+  } ]
+  @UI.selectionField: [ {
+    position: 70 
+  } ]
+  Zcdaz;
+  
+  @EndUserText.label: 'Ztpag'
+  @UI.identification: [ {
+    position: 80 , 
+    label: 'Ztpag'
+  } ]
+  @UI.lineItem: [ {
+    position: 80 , 
+    label: 'Ztpag'
+  } ]
+  @UI.selectionField: [ {
+    position: 80 
+  } ]
+  Ztpag;
+  
+  @UI.identification: [ {
+    position: 90 
+  } ]
+  @UI.lineItem: [ {
+    position: 90 
+  } ]
+  @UI.selectionField: [ {
+    position: 90 
+  } ]
+  Waers;
+  
+  @UI.identification: [ {
+    position: 100 
+  } ]
+  @UI.lineItem: [ {
+    position: 100 
+  } ]
+  @UI.selectionField: [ {
+    position: 100 
+  } ]
+  Lifnr;
+  
+  @EndUserText.label: 'Zamcf'
+  @UI.identification: [ {
+    position: 110 , 
+    label: 'Zamcf'
+  } ]
+  @UI.lineItem: [ {
+    position: 110 , 
+    label: 'Zamcf'
+  } ]
+  @UI.selectionField: [ {
+    position: 110 
+  } ]
+  Zamcf;
+  
+  @EndUserText.label: 'Zidfs'
+  @UI.identification: [ {
+    position: 120 , 
+    label: 'Zidfs'
+  } ]
+  @UI.lineItem: [ {
+    position: 120 , 
+    label: 'Zidfs'
+  } ]
+  @UI.selectionField: [ {
+    position: 120 
+  } ]
+  Zidfs;
+  
+  @UI.identification: [ {
+    position: 130 
+  } ]
+  @UI.lineItem: [ {
+    position: 130 
+  } ]
+  @UI.selectionField: [ {
+    position: 130 
+  } ]
+  Bldat;
+  
+  @UI.identification: [ {
+    position: 140 
+  } ]
+  @UI.lineItem: [ {
+    position: 140 
+  } ]
+  @UI.selectionField: [ {
+    position: 140 
+  } ]
+  Budat;
+  
+  @UI.identification: [ {
+    position: 150 
+  } ]
+  @UI.lineItem: [ {
+    position: 150 
+  } ]
+  @UI.selectionField: [ {
+    position: 150 
+  } ]
+  Blart;
+  
+  @EndUserText.label: 'UseDocRate'
+  @UI.identification: [ {
+    position: 160 , 
+    label: 'UseDocRate'
+  } ]
+  @UI.lineItem: [ {
+    position: 160 , 
+    label: 'UseDocRate'
+  } ]
+  @UI.selectionField: [ {
+    position: 160 
+  } ]
+  UseDocRate;
+  
+  @EndUserText.label: 'AssignmentRule'
+  @UI.identification: [ {
+    position: 170 , 
+    label: 'AssignmentRule'
+  } ]
+  @UI.lineItem: [ {
+    position: 170 , 
+    label: 'AssignmentRule'
+  } ]
+  @UI.selectionField: [ {
+    position: 170 
+  } ]
+  AssignmentRule;
+  
+  @EndUserText.label: 'AssignmentReference'
+  @UI.identification: [ {
+    position: 180 , 
+    label: 'AssignmentReference'
+  } ]
+  @UI.lineItem: [ {
+    position: 180 , 
+    label: 'AssignmentReference'
+  } ]
+  @UI.selectionField: [ {
+    position: 180 
+  } ]
+  AssignmentReference;
+  
+  @EndUserText.label: 'TextRule'
+  @UI.identification: [ {
+    position: 190 , 
+    label: 'TextRule'
+  } ]
+  @UI.lineItem: [ {
+    position: 190 , 
+    label: 'TextRule'
+  } ]
+  @UI.selectionField: [ {
+    position: 190 
+  } ]
+  TextRule;
+  
+  @EndUserText.label: 'ItemText'
+  @UI.identification: [ {
+    position: 200 , 
+    label: 'ItemText'
+  } ]
+  @UI.lineItem: [ {
+    position: 200 , 
+    label: 'ItemText'
+  } ]
+  @UI.selectionField: [ {
+    position: 200 
+  } ]
+  ItemText;
+  
+  @UI.identification: [ {
+    position: 210 
+  } ]
+  @UI.lineItem: [ {
+    position: 210 
+  } ]
+  @UI.selectionField: [ {
+    position: 210 
+  } ]
+  BusinessArea;
+  
+  @UI.identification: [ {
+    position: 220 
+  } ]
+  @UI.lineItem: [ {
+    position: 220 
+  } ]
+  @UI.selectionField: [ {
+    position: 220 
+  } ]
+  CostCenter;
+  
+  @UI.identification: [ {
+    position: 230 
+  } ]
+  @UI.lineItem: [ {
+    position: 230 
+  } ]
+  @UI.selectionField: [ {
+    position: 230 
+  } ]
+  OrderNumber;
+  
+  @UI.identification: [ {
+    position: 240 
+  } ]
+  @UI.lineItem: [ {
+    position: 240 
+  } ]
+  @UI.selectionField: [ {
+    position: 240 
+  } ]
+  ProfitCenter;
+  
+  @UI.identification: [ {
+    position: 250 
+  } ]
+  @UI.lineItem: [ {
+    position: 250 
+  } ]
+  @UI.selectionField: [ {
+    position: 250 
+  } ]
+  AccrualAccount;
+  
+  @UI.identification: [ {
+    position: 260 
+  } ]
+  @UI.lineItem: [ {
+    position: 260 
+  } ]
+  @UI.selectionField: [ {
+    position: 260 
+  } ]
+  MaturityAccount;
+  
+  @EndUserText.label: 'Amount'
+  @UI.identification: [ {
+    position: 270 , 
+    label: 'Amount'
+  } ]
+  @UI.lineItem: [ {
+    position: 270 , 
+    label: 'Amount'
+  } ]
+  @UI.selectionField: [ {
+    position: 270 
+  } ]
+  Amount;
+  
+  @EndUserText.label: 'SourceCount'
+  @UI.identification: [ {
+    position: 280 , 
+    label: 'SourceCount'
+  } ]
+  @UI.lineItem: [ {
+    position: 280 , 
+    label: 'SourceCount'
+  } ]
+  @UI.selectionField: [ {
+    position: 280 
+  } ]
+  SourceCount;
+  
+  @UI.identification: [ {
+    position: 290 
+  } ]
+  @UI.lineItem: [ {
+    position: 290 
+  } ]
+  @UI.selectionField: [ {
+    position: 290 
+  } ]
+  Xblnr;
+  
+  @UI.identification: [ {
+    position: 300 
+  } ]
+  @UI.lineItem: [ {
+    position: 300 
+  } ]
+  @UI.selectionField: [ {
+    position: 300 
+  } ]
+  XblnrGjahr;
+  
+  @UI.identification: [ {
+    position: 310 
+  } ]
+  @UI.lineItem: [ {
+    position: 310 
+  } ]
+  @UI.selectionField: [ {
+    position: 310 
+  } ]
+  Belnr;
+  
+  @UI.identification: [ {
+    position: 320 
+  } ]
+  @UI.lineItem: [ {
+    position: 320 
+  } ]
+  @UI.selectionField: [ {
+    position: 320 
+  } ]
+  BelnrGjahr;
+  
+  @UI.identification: [ {
+    position: 330 
+  } ]
+  @UI.lineItem: [ {
+    position: 330 
+  } ]
+  @UI.selectionField: [ {
+    position: 330 
+  } ]
+  CreatedBy;
+  
+  @UI.identification: [ {
+    position: 340 
+  } ]
+  @UI.lineItem: [ {
+    position: 340 
+  } ]
+  @UI.selectionField: [ {
+    position: 340 
+  } ]
+  CreatedAt;
+  
+  @UI.identification: [ {
+    position: 350 
+  } ]
+  @UI.lineItem: [ {
+    position: 350 
+  } ]
+  @UI.selectionField: [ {
+    position: 350 
+  } ]
+  ChangedBy;
+  
+  @UI.identification: [ {
+    position: 360 
+  } ]
+  @UI.lineItem: [ {
+    position: 360 
+  } ]
+  @UI.selectionField: [ {
+    position: 360 
+  } ]
+  ChangedAt;
+  
+  @EndUserText.label: 'LastMessage'
+  @UI.identification: [ {
+    position: 370 , 
+    label: 'LastMessage'
+  } ]
+  @UI.lineItem: [ {
+    position: 370 , 
+    label: 'LastMessage'
+  } ]
+  @UI.selectionField: [ {
+    position: 370 
+  } ]
+  LastMessage;
+}
