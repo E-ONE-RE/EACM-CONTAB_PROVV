@@ -1,9 +1,9 @@
 @AccessControl.authorizationCheck: #MANDATORY
 @Metadata.allowExtensions: true
-@ObjectModel.sapObjectNodeType.name: '/EACM/JOB_MTE'
+@ObjectModel.sapObjectNodeType.name: '/EACM/JOB_MDE'
 @EndUserText.label: '###GENERATED Core Data Service Entity'
-define root view entity /EACM/R_JOB_MTE
-  as select from /eacm/job_mte
+define root view entity /EACM/R_JOB_MDE
+  as select from /EACM/JOB_MDE
 {
   key job_uuid as JobUUID,
   status as Status,
@@ -20,8 +20,6 @@ define root view entity /EACM/R_JOB_MTE
   } ]
   waers as Waers,
   lifnr as Lifnr,
-  zamcf as Zamcf,
-  zidfs as Zidfs,
   bldat as Bldat,
   budat as Budat,
   blart as Blart,
@@ -34,10 +32,11 @@ define root view entity /EACM/R_JOB_MTE
   cost_center as CostCenter,
   order_number as OrderNumber,
   profit_center as ProfitCenter,
-  accrual_account as AccrualAccount,
-  maturity_account as MaturityAccount,
+  cost_account as CostAccount,
+  provision_account as ProvisionAccount,
+  provision_special_gl as ProvisionSpecialGl,
+  tax_code as TaxCode,
   amount as Amount,
-  tax_code ,
   source_count as SourceCount,
   xblnr as Xblnr,
   xblnr_gjahr as XblnrGjahr,

@@ -1,4 +1,4 @@
-@EndUserText.label: 'MDE posting action input'
+@EndUserText.label: 'MTE posting action input'
 define abstract entity /EACM/A_MTE_POST_INPUT
 {
   @Consumption.valueHelpDefinition: [{
@@ -13,30 +13,17 @@ define abstract entity /EACM/A_MTE_POST_INPUT
   UseDocumentDateRate    : abap_boolean;
   @Consumption.valueHelpDefinition: [{
     entity: {name: '/EACM/I_ZPRAA', element: 'Zcdaz' }}]
-  AgentFrom              : /eacm/zcdaz;
-  @Consumption.valueHelpDefinition: [{
-    entity: {name: '/EACM/I_ZPRAA', element: 'Zcdaz' }}]
-  AgentTo                : /eacm/zcdaz;
+  Agent                  : /eacm/zcdaz;
   @Consumption.valueHelpDefinition: [{
     entity: {name: '/EACM/I_ZPR02', element: 'Ztpag' }}]
-  PaymentTypeFrom        : abap.char(4);
-  @Consumption.valueHelpDefinition: [{
-    entity: {name: '/EACM/I_ZPR02', element: 'Ztpag' }}]
-  PaymentTypeTo          : abap.char(4);
+  @EndUserText.label: 'Tipo agente'
+  AgentType              : abap.char(4);
   @Consumption.valueHelpDefinition: [{
     entity: {name: '/EACM/I_TVKO', element: 'Vkorg' }}]
-  SalesOrgFrom           : vkorg;
-  @Consumption.valueHelpDefinition: [{
-    entity: {name: '/EACM/I_TVKO', element: 'Vkorg' }}]
-  SalesOrgTo             : vkorg;
-  CommissionClassFrom    : abap.char(10);
-  CommissionClassTo      : abap.char(10);
-  BillingDocumentFrom    : abap.char(10);
-  BillingDocumentTo      : abap.char(10);
-  DocumentDateFrom       : abap.dats;
-  DocumentDateTo         : abap.dats;
-  FacsimilePeriodFrom    : abap.char(6);
-  FacsimilePeriodTo      : abap.char(6);
+  SalesOrganization      : vkorg;
+  CommissionClass        : abap.char(10);
+  BillingDocument        : abap.char(10);
+  FacsimilePeriod        : abap.char(6);
   @Consumption.valueHelpDefinition: [{
     entity: {name: '/EACM/I_ZPR43', element: 'Zfratt' }}]
   AssignmentRule         : abap.char(10);

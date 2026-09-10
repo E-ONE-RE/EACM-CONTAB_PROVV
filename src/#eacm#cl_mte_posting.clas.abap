@@ -162,6 +162,10 @@ CLASS /eacm/cl_mte_posting DEFINITION
       IMPORTING is_selection TYPE ty_selection
       RETURNING VALUE(rt_zprdp) TYPE tt_zprdp.
 
+    METHODS get_posting_agent_type_range
+      IMPORTING it_requested_range TYPE tt_payment_type_range
+      RETURNING VALUE(rt_agent_type_range) TYPE tt_payment_type_range.
+
     METHODS get_agent
       IMPORTING
         iv_agent     TYPE /eacm/zcdaz
@@ -300,6 +304,10 @@ CLASS /eacm/cl_mte_posting DEFINITION
       IMPORTING it_result TYPE tt_result
       RETURNING VALUE(rv_message) TYPE string.
 
+    METHODS build_exception_message
+      IMPORTING ix_error TYPE REF TO cx_root
+      RETURNING VALUE(rv_message) TYPE string.
+
     METHODS append_message
       IMPORTING
         iv_type  TYPE symsgty
@@ -400,14 +408,6 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         CHANGING  ct_result = ct_result ).
     ENDIF.
 
-    IF is_selection-facsimile_period_range IS INITIAL.
-      rv_valid = abap_false.
-      append_message(
-        EXPORTING iv_type = gc_msg_error
-                  iv_text = 'Periodo fac-simile obbligatorio.'
-        CHANGING  ct_result = ct_result ).
-    ENDIF.
-
     IF is_selection-assignment_rule IS INITIAL
        AND is_selection-assignment_reference IS INITIAL.
       rv_valid = abap_false.
@@ -475,12 +475,14 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       lv_has_agent_range TYPE abap_bool,
       lv_has_sales_org_range TYPE abap_bool,
       lv_has_class_range TYPE abap_bool,
-      lv_has_billing_range TYPE abap_bool.
+      lv_has_billing_range TYPE abap_bool,
+      lv_has_facsimile_period_range TYPE abap_bool.
 
     lv_has_agent_range = xsdbool( is_selection-agent_range IS NOT INITIAL ).
     lv_has_sales_org_range = xsdbool( is_selection-sales_org_range IS NOT INITIAL ).
     lv_has_class_range = xsdbool( is_selection-commission_class_range IS NOT INITIAL ).
     lv_has_billing_range = xsdbool( is_selection-billing_document_range IS NOT INITIAL ).
+    lv_has_facsimile_period_range = xsdbool( is_selection-facsimile_period_range IS NOT INITIAL ).
 
     SELECT *  "#EC CI_ALL_FIELDS_NEEDED
       FROM /eacm/zprdp
@@ -488,13 +490,45 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         AND zdtsf <> @gc_zero_date
         AND zstre <> 'C'
         AND zstre <> 'D'
-        AND zamcf IN @is_selection-facsimile_period_range
+        AND ( @lv_has_facsimile_period_range = @abap_false
+              OR zamcf IN @is_selection-facsimile_period_range )
         AND ( @lv_has_agent_range = @abap_false OR zcdaz IN @is_selection-agent_range )
         AND ( @lv_has_sales_org_range = @abap_false OR vkorg IN @is_selection-sales_org_range )
         AND ( @lv_has_class_range = @abap_false OR zclpr IN @is_selection-commission_class_range )
         AND ( @lv_has_billing_range = @abap_false OR vbeln IN @is_selection-billing_document_range )
       ORDER BY bukrs, vkorg, zcdaz, vbeln, posnr, zidfs
       INTO TABLE @rt_zprdp.
+  ENDMETHOD.
+
+  METHOD get_posting_agent_type_range.
+    DATA lt_agent_types TYPE STANDARD TABLE OF /eacm/zpr02-ztpag WITH EMPTY KEY.
+
+    IF it_requested_range IS INITIAL.
+      SELECT DISTINCT ztpag
+        FROM /eacm/zpr02
+        WHERE zcont = 'X'
+        INTO TABLE @lt_agent_types.
+    ELSE.
+      SELECT DISTINCT ztpag
+        FROM /eacm/zpr02
+        WHERE zcont = 'X'
+          AND ztpag IN @it_requested_range
+        INTO TABLE @lt_agent_types.
+    ENDIF.
+
+    LOOP AT lt_agent_types INTO DATA(lv_agent_type).
+      APPEND VALUE #(
+        sign   = 'I'
+        option = 'EQ'
+        low    = lv_agent_type ) TO rt_agent_type_range.
+    ENDLOOP.
+
+    "Legacy CHECK_RANGE: un range vuoto deve selezionare soltanto il valore iniziale.
+    IF rt_agent_type_range IS INITIAL.
+      APPEND VALUE #(
+        sign   = 'I'
+        option = 'EQ' ) TO rt_agent_type_range.
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_agent.
@@ -654,23 +688,15 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
           ct_result = ct_result ).
     ENDIF.
 
-    IF rs_accounts-accrual_account IS INITIAL
-       AND rs_accounts-accrual_special_gl IS NOT INITIAL.
+    IF ( rs_accounts-accrual_account IS INITIAL
+         AND rs_accounts-accrual_special_gl IS NOT INITIAL
+         OR rs_accounts-maturity_account IS INITIAL
+         AND rs_accounts-maturity_special_gl IS NOT INITIAL )
+       AND is_agent-supplier IS INITIAL.
       append_message(
         EXPORTING
           iv_type = gc_msg_error
-          iv_text = |Maturande speciale G/L { rs_accounts-accrual_special_gl } per agente { is_zprdp-zcdaz }: estendere /EACM/CL_EACM_JOURNAL_POST_API con item fornitore/special G/L.|
-          iv_agent = is_zprdp-zcdaz
-        CHANGING
-          ct_result = ct_result ).
-    ENDIF.
-
-    IF rs_accounts-maturity_account IS INITIAL
-       AND rs_accounts-maturity_special_gl IS NOT INITIAL.
-      append_message(
-        EXPORTING
-          iv_type = gc_msg_error
-          iv_text = |Maturate speciale G/L { rs_accounts-maturity_special_gl } per agente { is_zprdp-zcdaz }: estendere /EACM/CL_EACM_JOURNAL_POST_API con item fornitore/special G/L.|
+          iv_text = |Fornitore non trovato per agente { is_zprdp-zcdaz }: necessario per la contabilizzazione Special G/L.|
           iv_agent = is_zprdp-zcdaz
         CHANGING
           ct_result = ct_result ).
@@ -863,7 +889,11 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD collect_to_post.
-    DATA(lt_zprdp) = load_source_rows( is_selection ).
+    DATA(ls_effective_selection) = is_selection.
+    ls_effective_selection-payment_type_range = get_posting_agent_type_range(
+      is_selection-payment_type_range ).
+
+    DATA(lt_zprdp) = load_source_rows( ls_effective_selection ).
     DATA ls_group TYPE ty_group.
     DATA lv_group_index TYPE sy-tabix.
     DATA lv_update_index TYPE sy-tabix.
@@ -871,13 +901,13 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
     LOOP AT lt_zprdp INTO DATA(ls_zprdp).
       DATA(ls_prdo) = get_prdo_info(
         is_zprdp     = ls_zprdp
-        is_selection = is_selection ).
+        is_selection = ls_effective_selection ).
 
       IF ls_prdo-payment_type IS INITIAL.
         append_message(
           EXPORTING
             iv_type = gc_msg_warning
-            iv_text = |Riga MTE { ls_zprdp-vbeln }/{ ls_zprdp-posnr } agente { ls_zprdp-zcdaz }: documento PRDO o tipo pagamento non trovato.|
+            iv_text = |Riga MTE { ls_zprdp-vbeln }/{ ls_zprdp-posnr } agente { ls_zprdp-zcdaz }: documento PRDO o tipo agente non trovato.|
             iv_agent = ls_zprdp-zcdaz
           CHANGING
             ct_result = ct_result ).
@@ -886,7 +916,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
 
       DATA(ls_agent) = get_agent(
         iv_agent     = ls_zprdp-zcdaz
-        is_selection = is_selection ).
+        is_selection = ls_effective_selection ).
 
       IF ls_agent-agent IS INITIAL.
         append_message(
@@ -908,8 +938,15 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         CHANGING
           ct_result = ct_result ).
 
-      IF ls_accounts-accrual_account IS INITIAL
-         OR ls_accounts-maturity_account IS INITIAL.
+      IF ( ls_accounts-accrual_account IS INITIAL
+           AND ls_accounts-accrual_special_gl IS INITIAL )
+         OR ( ls_accounts-maturity_account IS INITIAL
+              AND ls_accounts-maturity_special_gl IS INITIAL )
+         OR ( ( ls_accounts-accrual_account IS INITIAL
+                AND ls_accounts-accrual_special_gl IS NOT INITIAL
+                OR ls_accounts-maturity_account IS INITIAL
+                AND ls_accounts-maturity_special_gl IS NOT INITIAL )
+              AND ls_agent-supplier IS INITIAL ).
         CONTINUE.
       ENDIF.
 
@@ -1018,19 +1055,31 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
 
     APPEND VALUE /eacm/cl_eacm_journal_post_api=>ty_gl_item(
       gl_account        = is_group-accounts-accrual_account
+      supplier          = COND #( WHEN is_group-accounts-accrual_account IS INITIAL
+                                  THEN is_group-supplier )
+      special_gl_code   = COND #( WHEN is_group-accounts-accrual_account IS INITIAL
+                                  THEN is_group-accounts-accrual_special_gl )
       amount            = lv_abs_amount
       currency_code     = is_group-currency
       debit_credit_code = COND #( WHEN is_group-amount < 0 THEN 'H' ELSE 'S' )
       assignment_ref    = is_group-assignment_number
+      "EM: aggiunto
+      tax_code          = 'KZ' "is_group-accounts-tax_code
       item_text         = COND #( WHEN is_group-item_text IS INITIAL THEN 'eACM - MTE Maturande' ELSE is_group-item_text ) )
       TO ls_request-items.
 
     APPEND VALUE /eacm/cl_eacm_journal_post_api=>ty_gl_item(
       gl_account        = is_group-accounts-maturity_account
+      supplier          = COND #( WHEN is_group-accounts-maturity_account IS INITIAL
+                                  THEN is_group-supplier )
+      special_gl_code   = COND #( WHEN is_group-accounts-maturity_account IS INITIAL
+                                  THEN is_group-accounts-maturity_special_gl )
       amount            = lv_abs_amount
       currency_code     = is_group-currency
       debit_credit_code = COND #( WHEN is_group-amount < 0 THEN 'S' ELSE 'H' )
       assignment_ref    = is_group-assignment_number
+      "EM: aggiunto
+      tax_code          = 'KZ' "is_group-accounts-tax_code
       item_text         = COND #( WHEN is_group-item_text IS INITIAL THEN 'eACM - MTE Maturate' ELSE is_group-item_text ) )
       TO ls_request-items.
 
@@ -1183,6 +1232,11 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
               assignment_reference = @ls_status-assignment_reference,
               text_rule            = @ls_status-text_rule,
               item_text            = @ls_status-item_text,
+              lifnr                 = @ls_status-lifnr,
+              accrual_account       = @ls_status-accrual_account,
+              accrual_special_gl    = @ls_status-accrual_special_gl,
+              maturity_account      = @ls_status-maturity_account,
+              maturity_special_gl   = @ls_status-maturity_special_gl,
               amount               = @ls_status-amount,
               source_count         = @ls_status-source_count,
               belnr                = '',
@@ -1348,7 +1402,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       CATCH cx_root INTO DATA(lx_error).
         mark_status_error(
           is_status  = is_status
-          iv_message = lx_error->get_text( ) ).
+          iv_message = build_exception_message( lx_error ) ).
     ENDTRY.
 
     /eacm/cl_api_log=>flush( ).
@@ -1396,7 +1450,9 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       order_number          = is_group-assignment-order_number
       profit_center         = is_group-assignment-profit_center
       accrual_account       = is_group-accounts-accrual_account
+      accrual_special_gl    = is_group-accounts-accrual_special_gl
       maturity_account      = is_group-accounts-maturity_account
+      maturity_special_gl   = is_group-accounts-maturity_special_gl
       amount                = is_group-amount
       source_count          = lines( is_group-source_rows )
       xblnr                 = lv_uuid_c32(16)
@@ -1489,7 +1545,9 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       amount                = is_status-amount ).
 
     rs_group-accounts-accrual_account = is_status-accrual_account.
+    rs_group-accounts-accrual_special_gl = is_status-accrual_special_gl.
     rs_group-accounts-maturity_account = is_status-maturity_account.
+    rs_group-accounts-maturity_special_gl = is_status-maturity_special_gl.
     rs_group-assignment-business_area = is_status-business_area.
     rs_group-assignment-cost_center = is_status-cost_center.
     rs_group-assignment-order_number = is_status-order_number.
@@ -1628,6 +1686,68 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       rv_message = 'Contabilizzazione MTE terminata con errori.'.
     ELSEIF strlen( rv_message ) > 500.
       rv_message = substring( val = rv_message off = 0 len = 497 ) && `...`.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD build_exception_message.
+    DATA lo_error TYPE REF TO cx_root.
+    DATA lv_primary_text TYPE string.
+
+    lo_error = ix_error.
+
+    WHILE lo_error IS BOUND.
+      IF lo_error IS INSTANCE OF /eacm/cx_api_error.
+        DATA(lx_api_error) = CAST /eacm/cx_api_error( lo_error ).
+        IF lx_api_error->mv_context IS NOT INITIAL
+           AND ( rv_message IS INITIAL
+                 OR rv_message NS lx_api_error->mv_context ).
+          rv_message = COND #(
+            WHEN rv_message IS INITIAL
+            THEN lx_api_error->mv_context
+            ELSE |{ rv_message }; { lx_api_error->mv_context }| ).
+        ENDIF.
+      ENDIF.
+
+      DATA(lv_text) = lo_error->get_text( ).
+      IF lv_primary_text IS INITIAL.
+        lv_primary_text = lv_text.
+      ENDIF.
+
+      IF lv_text IS NOT INITIAL
+         AND ( rv_message IS INITIAL OR rv_message NS lv_text ).
+        rv_message = COND #(
+          WHEN rv_message IS INITIAL
+          THEN lv_text
+          ELSE |{ rv_message }; { lv_text }| ).
+      ENDIF.
+
+      lo_error = lo_error->previous.
+    ENDWHILE.
+
+    "Se non esiste una catena PREVIOUS, il long text puo contenere il dettaglio
+    "tecnico che GET_TEXT riduce al messaggio generico dell'eccezione wrapper.
+    IF ix_error IS BOUND
+       AND ix_error->previous IS NOT BOUND.
+      DATA(lv_longtext) = ix_error->get_longtext( ).
+      REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline
+        IN lv_longtext WITH ` `.
+      REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>cr_lf
+        IN lv_longtext WITH ` `.
+      CONDENSE lv_longtext.
+
+      IF lv_longtext IS NOT INITIAL
+         AND lv_longtext <> lv_primary_text
+         AND ( rv_message IS INITIAL OR rv_message NS lv_longtext ).
+        rv_message = COND #(
+          WHEN rv_message IS INITIAL
+          THEN lv_longtext
+          ELSE |{ rv_message }; { lv_longtext }| ).
+      ENDIF.
+    ENDIF.
+
+    IF rv_message IS INITIAL.
+      rv_message = 'Eccezione non identificata durante la contabilizzazione MTE.'.
     ENDIF.
   ENDMETHOD.
 

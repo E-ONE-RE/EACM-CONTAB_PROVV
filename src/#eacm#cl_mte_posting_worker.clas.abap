@@ -7,6 +7,7 @@ CLASS /eacm/cl_mte_posting_worker DEFINITION
     METHODS run_pending
       IMPORTING iv_max_requests TYPE i DEFAULT 20.
 
+protected section.
   PRIVATE SECTION.
     METHODS mark_unhandled_error
       IMPORTING
@@ -15,7 +16,9 @@ CLASS /eacm/cl_mte_posting_worker DEFINITION
 ENDCLASS.
 
 
-CLASS /eacm/cl_mte_posting_worker IMPLEMENTATION.
+
+CLASS /EACM/CL_MTE_POSTING_WORKER IMPLEMENTATION.
+
 
   METHOD run_pending.
     DATA lv_processed TYPE i.
@@ -24,6 +27,7 @@ CLASS /eacm/cl_mte_posting_worker IMPLEMENTATION.
       FROM /eacm/job_mte
       WHERE status = 'I'
          OR status = 'W'
+         OR status = 'E'  "togliere?
       ORDER BY changed_at, created_at
       INTO TABLE @DATA(lt_status).
 
@@ -75,4 +79,3 @@ CLASS /eacm/cl_mte_posting_worker IMPLEMENTATION.
     COMMIT WORK AND WAIT.
   ENDMETHOD.
 ENDCLASS.
-

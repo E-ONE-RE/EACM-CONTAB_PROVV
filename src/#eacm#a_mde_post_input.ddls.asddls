@@ -13,28 +13,18 @@ define abstract entity /eacm/a_mde_post_input
   UseDocumentDateRate    : abap_boolean;
   @Consumption.valueHelpDefinition: [{
     entity: {name: '/EACM/I_ZPRAA', element: 'Zcdaz' }}]
-  AgentFrom              : /eacm/zcdaz;
-  @Consumption.valueHelpDefinition: [{
-    entity: {name: '/EACM/I_ZPRAA', element: 'Zcdaz' }}]
-  AgentTo                : /eacm/zcdaz;
+  Agent                  : /eacm/zcdaz;
   @Consumption.valueHelpDefinition: [{
     entity: {name: '/EACM/I_ZPR02', element: 'Ztpag' }}]
-  PaymentTypeFrom        : abap.char(4);
-  @Consumption.valueHelpDefinition: [{
-    entity: {name: '/EACM/I_ZPR02', element: 'Ztpag' }}]
-  PaymentTypeTo          : abap.char(4);
+  @EndUserText.label: 'Tipo agente'
+  AgentType              : abap.char(4);
   @Consumption.valueHelpDefinition: [{
     entity: {name: '/EACM/I_TVKO', element: 'Vkorg' }}]
-  SalesOrgFrom           : vkorg;
-  @Consumption.valueHelpDefinition: [{
-    entity: {name: '/EACM/I_TVKO', element: 'Vkorg' }}]
-  SalesOrgTo             : vkorg;
-  CommissionClassFrom    : abap.char(10);
-  CommissionClassTo      : abap.char(10);
-  BillingDocumentFrom    : abap.char(10);
-  BillingDocumentTo      : abap.char(10);
-  DocumentDateFrom       : abap.dats;
-  DocumentDateTo         : abap.dats;
+  SalesOrganization      : vkorg;
+  CommissionClass        : abap.char(10);
+  BillingDocument        : abap.char(10);
+  BillingDocumentDateFrom : abap.dats;
+  BillingDocumentDateTo   : abap.dats;
   @Consumption.valueHelpDefinition: [{
     entity: {name: '/EACM/I_ZPR43', element: 'Zfratt' }}]
   AssignmentRule         : abap.char(10);

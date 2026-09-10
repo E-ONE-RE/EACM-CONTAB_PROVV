@@ -1,4 +1,4 @@
-CLASS /eacm/cl_mte_posting_request DEFINITION
+CLASS /eacm/cl_mde_posting_request DEFINITION
   PUBLIC
   FINAL
   CREATE PUBLIC.
@@ -11,10 +11,10 @@ CLASS /eacm/cl_mte_posting_request DEFINITION
         start_at TYPE timestamp,
       END OF ty_schedule_result.
 
-    TYPES tt_selection TYPE STANDARD TABLE OF /eacm/cl_mte_posting=>ty_selection WITH EMPTY KEY.
+    TYPES tt_selection TYPE STANDARD TABLE OF /eacm/cl_mde_posting=>ty_selection WITH EMPTY KEY.
 
     CLASS-METHODS enqueue
-      IMPORTING is_selection TYPE /eacm/cl_mte_posting=>ty_selection
+      IMPORTING is_selection TYPE /eacm/cl_mde_posting=>ty_selection
       RETURNING VALUE(rv_count) TYPE i
       RAISING /eacm/cx_eacm_posting.
 
@@ -26,18 +26,15 @@ CLASS /eacm/cl_mte_posting_request DEFINITION
       RETURNING VALUE(rs_result) TYPE ty_schedule_result
       RAISING /eacm/cx_eacm_posting.
 
-protected section.
   PRIVATE SECTION.
     CLASS-DATA gt_pending_selection TYPE tt_selection.
 ENDCLASS.
 
 
-
-CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
-
+CLASS /eacm/cl_mde_posting_request IMPLEMENTATION.
 
   METHOD enqueue.
-    rv_count = NEW /eacm/cl_mte_posting( )->count_status_requests( is_selection ).
+    rv_count = NEW /eacm/cl_mde_posting( )->count_status_requests( is_selection ).
     IF rv_count > 0.
       APPEND is_selection TO gt_pending_selection.
     ENDIF.
@@ -57,15 +54,15 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
 
     TRY.
         LOOP AT lt_pending_selection INTO DATA(ls_selection).
-          lv_enqueued_count += NEW /eacm/cl_mte_posting( )->enqueue_status_requests( ls_selection ).
+          lv_enqueued_count += NEW /eacm/cl_mde_posting( )->enqueue_status_requests( ls_selection ).
         ENDLOOP.
 
         IF lv_enqueued_count > 0.
           DATA(ls_schedule) = schedule_processing_job( iv_delay_seconds = 30 ).
-          lv_message = |Application Job MTE schedulato: { ls_schedule-jobname }/{ ls_schedule-jobcount }|.
+          lv_message = |Application Job MDE schedulato: { ls_schedule-jobname }/{ ls_schedule-jobcount }|.
 
           LOOP AT lt_pending_selection INTO ls_selection.
-            NEW /eacm/cl_mte_posting( )->update_status_schedule_message(
+            NEW /eacm/cl_mde_posting( )->update_status_schedule_message(
               is_selection = ls_selection
               iv_message   = lv_message ).
           ENDLOOP.
@@ -74,7 +71,7 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
       CATCH cx_root INTO DATA(lx_error).
         lv_message = lx_error->get_text( ).
         LOOP AT lt_pending_selection INTO ls_selection.
-          NEW /eacm/cl_mte_posting( )->update_status_schedule_message(
+          NEW /eacm/cl_mde_posting( )->update_status_schedule_message(
             is_selection = ls_selection
             iv_message   = lv_message
             iv_status    = 'E' ).
@@ -89,7 +86,7 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
 
 
   METHOD schedule_processing_job.
-    CONSTANTS lc_template_name TYPE cl_apj_rt_api=>ty_template_name VALUE '/EACM/APJT_MTE_POST'.
+    CONSTANTS lc_template_name TYPE cl_apj_rt_api=>ty_template_name VALUE '/EACM/APJT_MDE_POST'.
     DATA ls_start_info TYPE cl_apj_rt_api=>ty_start_info.
     DATA lv_start_at TYPE timestamp.
 
@@ -103,7 +100,7 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
         cl_apj_rt_api=>schedule_job(
           EXPORTING
             iv_job_template_name = lc_template_name
-            iv_job_text          = 'Contabilizzazione provvigioni maturate'
+            iv_job_text          = 'Contabilizzazione provvigioni maturande'
             is_start_info        = ls_start_info
           IMPORTING
             ev_jobname           = rs_result-jobname
@@ -113,7 +110,8 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
       CATCH cx_root INTO DATA(lx_error).
         RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
           EXPORTING
-            iv_text = |Errore pianificazione Application Job MTE: { lx_error->get_text( ) }|.
+            iv_text = |Errore pianificazione Application Job MDE: { lx_error->get_text( ) }|.
     ENDTRY.
   ENDMETHOD.
 ENDCLASS.
+

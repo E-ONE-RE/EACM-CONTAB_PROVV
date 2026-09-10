@@ -1,0 +1,11 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "SAP Object Node Type /EACM/JOB_MDE",
+    "originalLanguage": "en",
+    "abapLanguageVersion": "cloudDevelopment"
+  },
+  "name": "/EACM/JOB_MDE",
+  "sapObjectType": "/EACM/JOB_MDE",
+  "rootNode": true
+}

@@ -1,0 +1,75 @@
+managed implementation in class /EACM/BP_R_JOB_MDE unique;
+strict ( 2 );
+with draft;
+extensible;
+define behavior for /EACM/R_JOB_MDE alias /eacm/rJobMde
+persistent table /EACM/JOB_MDE
+extensible
+draft table /EACM/JOB_MDE_D
+etag master ChangedAt
+lock master total etag ChangedAt
+authorization master( global )
+{
+  field ( readonly )
+   JobUUID,
+   CreatedBy,
+   CreatedAt,
+   ChangedBy,
+   ChangedAt;
+
+  field ( numbering : managed )
+   JobUUID;
+
+
+  create;
+  update;
+  delete;
+
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Edit;
+  draft action Resume;
+  draft determine action Prepare;
+
+  mapping for /EACM/JOB_MDE corresponding extensible
+  {
+    JobUUID = JOB_UUID;
+    Status = STATUS;
+    Bukrs = BUKRS;
+    Vkorg = VKORG;
+    Vtweg = VTWEG;
+    Zclpr = ZCLPR;
+    Zcdaz = ZCDAZ;
+    Ztpag = ZTPAG;
+    Waers = WAERS;
+    Lifnr = LIFNR;
+    Bldat = BLDAT;
+    Budat = BUDAT;
+    Blart = BLART;
+    UseDocRate = USE_DOC_RATE;
+    AssignmentRule = ASSIGNMENT_RULE;
+    AssignmentReference = ASSIGNMENT_REFERENCE;
+    TextRule = TEXT_RULE;
+    ItemText = ITEM_TEXT;
+    BusinessArea = BUSINESS_AREA;
+    CostCenter = COST_CENTER;
+    OrderNumber = ORDER_NUMBER;
+    ProfitCenter = PROFIT_CENTER;
+    CostAccount = COST_ACCOUNT;
+    ProvisionAccount = PROVISION_ACCOUNT;
+    ProvisionSpecialGl = PROVISION_SPECIAL_GL;
+    TaxCode = TAX_CODE;
+    Amount = AMOUNT;
+    SourceCount = SOURCE_COUNT;
+    Xblnr = XBLNR;
+    XblnrGjahr = XBLNR_GJAHR;
+    Belnr = BELNR;
+    BelnrGjahr = BELNR_GJAHR;
+    CreatedBy = CREATED_BY;
+    CreatedAt = CREATED_AT;
+    ChangedBy = CHANGED_BY;
+    ChangedAt = CHANGED_AT;
+    LastMessage = LAST_MESSAGE;
+  }
+
+}

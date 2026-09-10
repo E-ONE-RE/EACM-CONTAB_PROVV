@@ -64,10 +64,7 @@ annotate view /EACM/C_CONTMTE with
   @UI.identification: [ {
     position: 40 
   } ]
-  @UI.lineItem: [ {
-    position: 40 
-  } ]
-  CommissionClass;
+   CommissionClass;
   
   @UI.identification: [ {
     position: 50 
@@ -104,9 +101,6 @@ annotate view /EACM/C_CONTMTE with
   Agent;
   
   @UI.identification: [ {
-    position: 80 
-  } ]
-  @UI.lineItem: [ {
     position: 80 
   } ]
 
@@ -148,12 +142,6 @@ annotate view /EACM/C_CONTMTE with
   @UI.identification: [ {
     position: 120 
   } ]
-  @UI.lineItem: [ {
-    position: 120 
-  } ]
-  @UI.selectionField: [ {
-    position: 120 
-  } ]
   FacsimileSettlementDate;
   
   @UI.identification: [ {
@@ -168,12 +156,6 @@ annotate view /EACM/C_CONTMTE with
   PostingDate;
   
   @UI.identification: [ {
-    position: 140 
-  } ]
-  @UI.lineItem: [ {
-    position: 140 
-  } ]
-  @UI.selectionField: [ {
     position: 140 
   } ]
   MteDocumentDate;
@@ -192,18 +174,10 @@ annotate view /EACM/C_CONTMTE with
   @UI.identification: [ {
     position: 160 
   } ]
-  @UI.lineItem: [ {
-    position: 160 
-  } ]
-  @UI.selectionField: [ {
-    position: 160 
-  } ]
+
   AgentPaymentType;
   
   @UI.identification: [ {
-    position: 170 
-  } ]
-  @UI.lineItem: [ {
     position: 170 
   } ]
 
@@ -212,16 +186,10 @@ annotate view /EACM/C_CONTMTE with
   @UI.identification: [ {
     position: 180 
   } ]
-  @UI.lineItem: [ {
-    position: 180 
-  } ]
-
+ 
   ExchangeRate;
   
   @UI.identification: [ {
-    position: 190 
-  } ]
-  @UI.lineItem: [ {
     position: 190 
   } ]
 
@@ -239,88 +207,79 @@ annotate view /EACM/C_CONTMTE with
   @UI.identification: [ {
     position: 210 
   } ]
-  @UI.lineItem: [ {
-    position: 210 
-  } ]
 
   PaymentDueDate;
   
   @UI.identification: [ {
     position: 220 
   } ]
-  @UI.lineItem: [ {
-    position: 220 
-  } ]
-
+ 
   PayableCommissionAmount;
   
   @UI.identification: [ {
     position: 230 
   } ]
-  @UI.lineItem: [ {
-    position: 230 
-  } ]
 
   CommissionPercentage;
   
-  @UI.identification: [ {
-    position: 240 
-  } ]
-  @UI.lineItem: [ {
-    position: 240 
-  } ]
-
-  SourceCommissionClass;
-  
-  @UI.identification: [ {
-    position: 250 
-  } ]
-  @UI.lineItem: [ {
-    position: 250 
-  } ]
-
-  AccruedCommissionAmount;
-  
-  @UI.identification: [ {
-    position: 260 
-  } ]
-  @UI.lineItem: [ {
-    position: 260 
-  } ]
-
-  AgentInvoiceDate;
-  
-  @UI.identification: [ {
-    position: 270 
-  } ]
-  @UI.lineItem: [ {
-    position: 270 
-  } ]
-  @UI.selectionField: [ {
-    position: 270 
-  } ]
-  AgentInvoiceNumber;
-  
-  @UI.identification: [ {
-    position: 280 
-  } ]
-  @UI.lineItem: [ {
-    position: 280 
-  } ]
-  @UI.selectionField: [ {
-    position: 280 
-  } ]
-  AgentInvoiceFiscalYear;
-  
-  @UI.identification: [ {
-    position: 290 
-  } ]
-  @UI.lineItem: [ {
-    position: 290 
-  } ]
-
-  AgentInvoiceRegistrationDate;
-  
+//  @UI.identification: [ {
+//    position: 240 
+//  } ]
+//  @UI.lineItem: [ {
+//    position: 240 
+//  } ]
+//
+//  SourceCommissionClass;
+//  
+//  @UI.identification: [ {
+//    position: 250 
+//  } ]
+//  @UI.lineItem: [ {
+//    position: 250 
+//  } ]
+//
+//  AccruedCommissionAmount;
+//  
+//  @UI.identification: [ {
+//    position: 260 
+//  } ]
+//  @UI.lineItem: [ {
+//    position: 260 
+//  } ]
+//
+//  AgentInvoiceDate;
+//  
+//  @UI.identification: [ {
+//    position: 270 
+//  } ]
+//  @UI.lineItem: [ {
+//    position: 270 
+//  } ]
+//  @UI.selectionField: [ {
+//    position: 270 
+//  } ]
+//  AgentInvoiceNumber;
+//  
+//  @UI.identification: [ {
+//    position: 280 
+//  } ]
+//  @UI.lineItem: [ {
+//    position: 280 
+//  } ]
+//  @UI.selectionField: [ {
+//    position: 280 
+//  } ]
+//  AgentInvoiceFiscalYear;
+//  
+//  @UI.identification: [ {
+//    position: 290 
+//  } ]
+//  @UI.lineItem: [ {
+//    position: 290 
+//  } ]
+//
+//  AgentInvoiceRegistrationDate;
+//  
   @UI.identification: [ {
     position: 300 
   } ]

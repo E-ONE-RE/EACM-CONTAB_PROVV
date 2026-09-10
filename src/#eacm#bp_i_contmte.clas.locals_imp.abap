@@ -45,58 +45,46 @@ METHOD PostMte.
       use_document_date_rate   = <key>-%param-UseDocumentDateRate
       defer_status_update      = abap_true ).
 
-    IF <key>-%param-AgentFrom IS NOT INITIAL
-       OR <key>-%param-AgentTo IS NOT INITIAL.
+    IF <key>-%param-Agent IS NOT INITIAL.
       APPEND VALUE #(
         sign   = 'I'
-        option = COND #( WHEN <key>-%param-AgentTo IS INITIAL THEN 'EQ' ELSE 'BT' )
-        low    = <key>-%param-AgentFrom
-        high   = <key>-%param-AgentTo ) TO ls_selection-agent_range.
+        option = 'EQ'
+        low    = <key>-%param-Agent ) TO ls_selection-agent_range.
     ENDIF.
 
-    IF <key>-%param-PaymentTypeFrom IS NOT INITIAL
-       OR <key>-%param-PaymentTypeTo IS NOT INITIAL.
+    IF <key>-%param-AgentType IS NOT INITIAL.
       APPEND VALUE #(
         sign   = 'I'
-        option = COND #( WHEN <key>-%param-PaymentTypeTo IS INITIAL THEN 'EQ' ELSE 'BT' )
-        low    = <key>-%param-PaymentTypeFrom
-        high   = <key>-%param-PaymentTypeTo ) TO ls_selection-payment_type_range.
+        option = 'EQ'
+        low    = <key>-%param-AgentType ) TO ls_selection-payment_type_range.
     ENDIF.
 
-    IF <key>-%param-SalesOrgFrom IS NOT INITIAL
-       OR <key>-%param-SalesOrgTo IS NOT INITIAL.
+    IF <key>-%param-SalesOrganization IS NOT INITIAL.
       APPEND VALUE #(
         sign   = 'I'
-        option = COND #( WHEN <key>-%param-SalesOrgTo IS INITIAL THEN 'EQ' ELSE 'BT' )
-        low    = <key>-%param-SalesOrgFrom
-        high   = <key>-%param-SalesOrgTo ) TO ls_selection-sales_org_range.
+        option = 'EQ'
+        low    = <key>-%param-SalesOrganization ) TO ls_selection-sales_org_range.
     ENDIF.
 
-    IF <key>-%param-CommissionClassFrom IS NOT INITIAL
-       OR <key>-%param-CommissionClassTo IS NOT INITIAL.
+    IF <key>-%param-CommissionClass IS NOT INITIAL.
       APPEND VALUE #(
         sign   = 'I'
-        option = COND #( WHEN <key>-%param-CommissionClassTo IS INITIAL THEN 'EQ' ELSE 'BT' )
-        low    = <key>-%param-CommissionClassFrom
-        high   = <key>-%param-CommissionClassTo ) TO ls_selection-commission_class_range.
+        option = 'EQ'
+        low    = <key>-%param-CommissionClass ) TO ls_selection-commission_class_range.
     ENDIF.
 
-    IF <key>-%param-BillingDocumentFrom IS NOT INITIAL
-       OR <key>-%param-BillingDocumentTo IS NOT INITIAL.
+    IF <key>-%param-BillingDocument IS NOT INITIAL.
       APPEND VALUE #(
         sign   = 'I'
-        option = COND #( WHEN <key>-%param-BillingDocumentTo IS INITIAL THEN 'EQ' ELSE 'BT' )
-        low    = <key>-%param-BillingDocumentFrom
-        high   = <key>-%param-BillingDocumentTo ) TO ls_selection-billing_document_range.
+        option = 'EQ'
+        low    = <key>-%param-BillingDocument ) TO ls_selection-billing_document_range.
     ENDIF.
 
-    IF <key>-%param-FacsimilePeriodFrom IS NOT INITIAL
-       OR <key>-%param-FacsimilePeriodTo IS NOT INITIAL.
+    IF <key>-%param-FacsimilePeriod IS NOT INITIAL.
       APPEND VALUE #(
         sign   = 'I'
-        option = COND #( WHEN <key>-%param-FacsimilePeriodTo IS INITIAL THEN 'EQ' ELSE 'BT' )
-        low    = <key>-%param-FacsimilePeriodFrom
-        high   = <key>-%param-FacsimilePeriodTo ) TO ls_selection-facsimile_period_range.
+        option = 'EQ'
+        low    = <key>-%param-FacsimilePeriod ) TO ls_selection-facsimile_period_range.
     ENDIF.
 
     IF ls_selection-test_run <> abap_true.
@@ -261,4 +249,5 @@ CLASS lsc_I_CONTMTE IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
 

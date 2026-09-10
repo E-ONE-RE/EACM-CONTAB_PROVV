@@ -1,16 +1,16 @@
 @Metadata.allowExtensions: true
 @Metadata.ignorePropagatedAnnotations: true
-@EndUserText: {
-  label: '###GENERATED Core Data Service Entity'
+@Endusertext: {
+  Label: '###GENERATED Core Data Service Entity'
 }
-@ObjectModel: {
-  sapObjectNodeType.name: '/EACM/JOB_MTE'
+@Objectmodel: {
+  Sapobjectnodetype.Name: '/EACM/JOB_MDE'
 }
 @AccessControl.authorizationCheck: #MANDATORY
-define root view entity /EACM/C_JOB_MTE
-  provider contract transactional_query
-  as projection on /EACM/R_JOB_MTE
-  association [1..1] to /EACM/R_JOB_MTE as _BaseEntity on $projection.JOBUUID = _BaseEntity.JOBUUID
+define root view entity /EACM/C_JOB_MDE
+  provider contract TRANSACTIONAL_QUERY
+  as projection on /EACM/R_JOB_MDE
+  association [1..1] to /EACM/R_JOB_MDE as _BaseEntity on $projection.JOBUUID = _BaseEntity.JOBUUID
 {
   key JobUUID,
   Status,
@@ -21,16 +21,14 @@ define root view entity /EACM/C_JOB_MTE
   Zcdaz,
   Ztpag,
   @Consumption: {
-    valueHelpDefinition: [ {
-      entity.element: 'Currency', 
-      entity.name: 'I_CurrencyStdVH', 
-      useForValidation: true
+    Valuehelpdefinition: [ {
+      Entity.Element: 'Currency', 
+      Entity.Name: 'I_CurrencyStdVH', 
+      Useforvalidation: true
     } ]
   }
   Waers,
   Lifnr,
-  Zamcf,
-  Zidfs,
   Bldat,
   Budat,
   Blart,
@@ -43,9 +41,10 @@ define root view entity /EACM/C_JOB_MTE
   CostCenter,
   OrderNumber,
   ProfitCenter,
-  AccrualAccount,
-  MaturityAccount,
-  tax_code,
+  CostAccount,
+  ProvisionAccount,
+  ProvisionSpecialGl,
+  TaxCode,
   Amount,
   SourceCount,
   Xblnr,
@@ -53,19 +52,19 @@ define root view entity /EACM/C_JOB_MTE
   Belnr,
   BelnrGjahr,
   @Semantics: {
-    user.createdBy: true
+    User.Createdby: true
   }
   CreatedBy,
   @Semantics: {
-    systemDateTime.createdAt: true
+    Systemdatetime.Createdat: true
   }
   CreatedAt,
   @Semantics: {
-    user.lastChangedBy: true
+    User.Lastchangedby: true
   }
   ChangedBy,
   @Semantics: {
-    systemDateTime.lastChangedAt: true
+    Systemdatetime.Lastchangedat: true
   }
   ChangedAt,
   LastMessage,

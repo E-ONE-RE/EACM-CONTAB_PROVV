@@ -3,9 +3,8 @@
 @UI.headerInfo.title.value: 'JobUUID'
 @UI.headerInfo.description.type: #STANDARD
 @UI.headerInfo.description.value: 'JobUUID'
-annotate view /EACM/C_JOB_MTE with
+annotate view /EACM/C_JOB_MDE with
 {
-  @EndUserText.label: 'JobUUID'
   @UI.facet: [ {
     label: 'General Information', 
     id: 'GeneralInfo', 
@@ -13,6 +12,7 @@ annotate view /EACM/C_JOB_MTE with
     position: 10 , 
     type: #IDENTIFICATION_REFERENCE
   } ]
+  @EndUserText.label: 'JobUUID'
   @UI.identification: [ {
     position: 10 , 
     label: 'JobUUID'
@@ -103,13 +103,13 @@ annotate view /EACM/C_JOB_MTE with
     position: 80 , 
     label: 'Ztpag'
   } ]
-//  @UI.lineItem: [ {
-//    position: 80 , 
-//    label: 'Ztpag'
-//  } ]
-//  @UI.selectionField: [ {
-//    position: 80 
-//  } ]
+  @UI.lineItem: [ {
+    position: 80 , 
+    label: 'Ztpag'
+  } ]
+  @UI.selectionField: [ {
+    position: 80 
+  } ]
   Ztpag;
   
   @UI.identification: [ {
@@ -134,147 +134,141 @@ annotate view /EACM/C_JOB_MTE with
   } ]
   Lifnr;
   
-  @EndUserText.label: 'Zamcf'
   @UI.identification: [ {
-    position: 110 , 
-    label: 'Zamcf'
+    position: 110 
   } ]
   @UI.lineItem: [ {
-    position: 110 , 
-    label: 'Zamcf'
-  } ]
-//  @UI.selectionField: [ {
-//    position: 110 
-//  } ]
-  Zamcf;
-  
-  @EndUserText.label: 'Zidfs'
-  @UI.identification: [ {
-    position: 120 , 
-    label: 'Zidfs'
-  } ]
-  @UI.lineItem: [ {
-    position: 120 , 
-    label: 'Zidfs'
-  } ]
-//  @UI.selectionField: [ {
-//    position: 120 
-//  } ]
-  Zidfs;
-  
-  @UI.identification: [ {
-    position: 130 
-  } ]
-  @UI.lineItem: [ {
-    position: 130 
+    position: 110 
   } ]
   @UI.selectionField: [ {
-    position: 130 
+    position: 110 
   } ]
   Bldat;
   
   @UI.identification: [ {
-    position: 140 
+    position: 120 
   } ]
   @UI.lineItem: [ {
-    position: 140 
+    position: 120 
   } ]
   @UI.selectionField: [ {
-    position: 140 
+    position: 120 
   } ]
   Budat;
   
   @UI.identification: [ {
-    position: 150 
+    position: 130 
   } ]
   @UI.lineItem: [ {
-    position: 150 
+    position: 130 
   } ]
 //  @UI.selectionField: [ {
-//    position: 150 
+//    position: 130 
 //  } ]
   Blart;
   
   @EndUserText.label: 'UseDocRate'
   @UI.identification: [ {
-    position: 160 , 
+    position: 140 , 
     label: 'UseDocRate'
   } ]
 //  @UI.lineItem: [ {
-//    position: 160 , 
+//    position: 140 , 
 //    label: 'UseDocRate'
 //  } ]
 //  @UI.selectionField: [ {
-//    position: 160 
+//    position: 140 
 //  } ]
   UseDocRate;
   
   @EndUserText.label: 'AssignmentRule'
   @UI.identification: [ {
-    position: 170 , 
+    position: 150 , 
     label: 'AssignmentRule'
   } ]
 //  @UI.lineItem: [ {
-//    position: 170 , 
+//    position: 150 , 
 //    label: 'AssignmentRule'
 //  } ]
 //  @UI.selectionField: [ {
-//    position: 170 
+//    position: 150 
 //  } ]
   AssignmentRule;
   
   @EndUserText.label: 'AssignmentReference'
   @UI.identification: [ {
-    position: 180 , 
+    position: 160 , 
     label: 'AssignmentReference'
   } ]
 //  @UI.lineItem: [ {
-//    position: 180 , 
+//    position: 160 , 
 //    label: 'AssignmentReference'
 //  } ]
 //  @UI.selectionField: [ {
-//    position: 180 
+//    position: 160 
 //  } ]
   AssignmentReference;
   
   @EndUserText.label: 'TextRule'
   @UI.identification: [ {
-    position: 190 , 
+    position: 170 , 
     label: 'TextRule'
   } ]
 //  @UI.lineItem: [ {
-//    position: 190 , 
+//    position: 170 , 
 //    label: 'TextRule'
 //  } ]
 //  @UI.selectionField: [ {
-//    position: 190 
+//    position: 170 
 //  } ]
   TextRule;
   
   @EndUserText.label: 'ItemText'
   @UI.identification: [ {
-    position: 200 , 
+    position: 180 , 
     label: 'ItemText'
   } ]
-  @UI.lineItem: [ {
-    position: 200 , 
-    label: 'ItemText'
-  } ]
+//  @UI.lineItem: [ {
+//    position: 180 , 
+//    label: 'ItemText'
+//  } ]
 //  @UI.selectionField: [ {
-//    position: 200 
+//    position: 180 
 //  } ]
   ItemText;
   
   @UI.identification: [ {
-    position: 210 
+    position: 190 
   } ]
 //  @UI.lineItem: [ {
-//    position: 210 
+//    position: 190 
 //  } ]
+//  @UI.selectionField: [ {
+//    position: 190 
+//  } ]
+  BusinessArea;
+  
+  @UI.identification: [ {
+    position: 200 
+  } ]
+  @UI.lineItem: [ {
+    position: 200 
+  } ]
+//  @UI.selectionField: [ {
+//    position: 200 
+//  } ]
+  CostCenter;
+  
+  @UI.identification: [ {
+    position: 210 
+  } ]
+  @UI.lineItem: [ {
+    position: 210 
+  } ]
 //  @UI.selectionField: [ {
 //    position: 210 
 //  } ]
-  BusinessArea;
+  OrderNumber;
   
   @UI.identification: [ {
     position: 220 
@@ -285,7 +279,7 @@ annotate view /EACM/C_JOB_MTE with
 //  @UI.selectionField: [ {
 //    position: 220 
 //  } ]
-  CostCenter;
+  ProfitCenter;
   
   @UI.identification: [ {
     position: 230 
@@ -296,7 +290,7 @@ annotate view /EACM/C_JOB_MTE with
 //  @UI.selectionField: [ {
 //    position: 230 
 //  } ]
-  OrderNumber;
+  CostAccount;
   
   @UI.identification: [ {
     position: 240 
@@ -307,7 +301,7 @@ annotate view /EACM/C_JOB_MTE with
 //  @UI.selectionField: [ {
 //    position: 240 
 //  } ]
-  ProfitCenter;
+  ProvisionAccount;
   
   @UI.identification: [ {
     position: 250 
@@ -318,7 +312,7 @@ annotate view /EACM/C_JOB_MTE with
 //  @UI.selectionField: [ {
 //    position: 250 
 //  } ]
-  AccrualAccount;
+  ProvisionSpecialGl;
   
   @UI.identification: [ {
     position: 260 
@@ -329,13 +323,7 @@ annotate view /EACM/C_JOB_MTE with
 //  @UI.selectionField: [ {
 //    position: 260 
 //  } ]
-  MaturityAccount;
-  @EndUserText.label: 'tax_code'
-  @UI.identification: [ {
-    position: 265 , 
-    label: 'tax_code'
-  } ]
-  tax_code       ;
+  TaxCode;
   
   @EndUserText.label: 'Amount'
   @UI.identification: [ {
@@ -371,17 +359,17 @@ annotate view /EACM/C_JOB_MTE with
   @UI.lineItem: [ {
     position: 290 
   } ]
-//  @UI.selectionField: [ {
-//    position: 290 
-//  } ]
+  @UI.selectionField: [ {
+    position: 290 
+  } ]
   Xblnr;
   
   @UI.identification: [ {
     position: 300 
   } ]
-  @UI.lineItem: [ {
-    position: 300 
-  } ]
+//  @UI.lineItem: [ {
+//    position: 300 
+//  } ]
 //  @UI.selectionField: [ {
 //    position: 300 
 //  } ]
@@ -458,10 +446,10 @@ annotate view /EACM/C_JOB_MTE with
     position: 370 , 
     label: 'LastMessage'
   } ]
-  @UI.lineItem: [ {
-    position: 370 , 
-    label: 'LastMessage'
-  } ]
+//  @UI.lineItem: [ {
+//    position: 370 , 
+//    label: 'LastMessage'
+//  } ]
 //  @UI.selectionField: [ {
 //    position: 370 
 //  } ]
