@@ -48,7 +48,13 @@ CLASS /eacm/cl_mte_posting DEFINITION
       END OF ty_result,
       tt_result TYPE STANDARD TABLE OF ty_result WITH EMPTY KEY.
 
+    TYPES tt_job_status TYPE STANDARD TABLE OF /eacm/job_mte WITH EMPTY KEY.
+
     METHODS run
+      IMPORTING is_selection TYPE ty_selection
+      RETURNING VALUE(rt_result) TYPE tt_result.
+
+    METHODS run_direct
       IMPORTING is_selection TYPE ty_selection
       RETURNING VALUE(rt_result) TYPE tt_result.
 
@@ -69,10 +75,19 @@ CLASS /eacm/cl_mte_posting DEFINITION
         iv_status    TYPE /eacm/job_mte-status OPTIONAL.
 
     METHODS process_status
-      IMPORTING is_status TYPE /eacm/job_mte
+      IMPORTING
+        is_status TYPE /eacm/job_mte
+        iv_direct TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(rt_result) TYPE tt_result.
 
   PRIVATE SECTION.
+    METHODS prepare_status_requests
+      IMPORTING is_selection TYPE ty_selection
+      EXPORTING
+        ev_count TYPE i
+        et_status TYPE tt_job_status
+      RAISING /eacm/cx_eacm_posting.
+
     TYPES:
       BEGIN OF ty_config,
         company_code        TYPE bukrs,
@@ -381,6 +396,61 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+
+  METHOD run_direct.
+    DATA lt_status TYPE tt_job_status.
+    DATA lv_count TYPE i.
+
+    TRY.
+        prepare_status_requests(
+          EXPORTING is_selection = is_selection
+          IMPORTING ev_count = lv_count
+                    et_status = lt_status ).
+      CATCH cx_root INTO DATA(lx_prepare).
+        DATA(lv_prepare_error) = build_exception_message( lx_prepare ).
+        LOOP AT lt_status INTO DATA(ls_prepared_status).
+          mark_status_error(
+            is_status = ls_prepared_status
+            iv_message = lv_prepare_error ).
+        ENDLOOP.
+        append_message(
+          EXPORTING
+            iv_type = gc_msg_error
+            iv_text = lv_prepare_error
+          CHANGING ct_result = rt_result ).
+        RETURN.
+    ENDTRY.
+
+    IF lt_status IS INITIAL.
+      append_message(
+        EXPORTING
+          iv_type = gc_msg_warning
+          iv_text = 'Nessuna richiesta MTE nuova da contabilizzare direttamente.'
+        CHANGING ct_result = rt_result ).
+      RETURN.
+    ENDIF.
+
+    LOOP AT lt_status INTO DATA(ls_status).
+      TRY.
+          DATA(lt_processed) = process_status(
+            is_status = ls_status
+            iv_direct = abap_true ).
+          APPEND LINES OF lt_processed TO rt_result.
+        CATCH cx_root INTO DATA(lx_process).
+          DATA(lv_error) = build_exception_message( lx_process ).
+          mark_status_error(
+            is_status = ls_status
+            iv_message = lv_error ).
+          append_message(
+            EXPORTING
+              iv_type = gc_msg_error
+              iv_text = lv_error
+              iv_agent = ls_status-zcdaz
+            CHANGING ct_result = rt_result ).
+      ENDTRY.
+    ENDLOOP.
+  ENDMETHOD.
+
   METHOD validate.
     rv_valid = abap_true.
 
@@ -487,6 +557,13 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
     SELECT *  "#EC CI_ALL_FIELDS_NEEDED
       FROM /eacm/zprdp
       WHERE bukrs = @is_selection-company_code
+***** EM 14/9/26 aggiunto
+  " MTE (/EACM/COM): eligible classes, excluding advances; ZRIPR is ignored.
+        AND zclpr IN ( SELECT zclpr FROM /eacm/zpr08
+                         WHERE bukrs = @is_selection-company_code
+                           AND zcapr = 'X'
+                           AND zant <> 'X' )
+********
         AND zdtsf <> @gc_zero_date
         AND zstre <> 'C'
         AND zstre <> 'D'
@@ -637,16 +714,20 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
     IF sy-subrc <> 0
        OR ( lv_zcpts IS INITIAL
             AND rs_accounts-accrual_special_gl IS INITIAL ).
-      SELECT SINGLE zcpts, zcpts_cs, zcppm, zcppm_cs, mwskz
+*      SELECT SINGLE zcpts, zcpts_cs, zcppm, zcppm_cs, mwskz
+      SELECT zcpts, zcpts_cs, zcppm, zcppm_cs, mwskz
         FROM /eacm/zprsp
         WHERE bukrs = @is_zprdp-bukrs
           AND ztpag = @is_prdo-payment_type
           AND waerk = @lv_currency
+        ORDER BY zcpts
         INTO (@lv_zcpts,
               @rs_accounts-accrual_special_gl,
               @rs_accounts-maturity_account,
               @rs_accounts-maturity_special_gl,
-              @rs_accounts-tax_code).
+              @rs_accounts-tax_code)
+        UP TO 1 ROWS.
+      ENDSELECT.
     ENDIF.
 
     IF lv_zcpts IS INITIAL
@@ -706,26 +787,48 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
   METHOD determine_assignment.
     rs_assignment-business_area = determine_business_area( is_zprdp ).
 
-    SELECT SINGLE kostl, aufnr, prctr
+*    SELECT SINGLE kostl, aufnr, prctr
+    SELECT kostl, aufnr, prctr
       FROM /eacm/zpr13
       WHERE kokrs = @is_config-kokrs
         AND vkorg = @is_zprdp-vkorg
         AND zclpr = @is_zprdp-zclpr
         AND zcdaz = @is_zprdp-zcdaz
+        ORDER BY kostl
       INTO (@rs_assignment-cost_center,
             @rs_assignment-order_number,
-            @rs_assignment-profit_center).
+            @rs_assignment-profit_center)
+      UP TO 1 ROWS.
+    ENDSELECT.
+
 
     IF sy-subrc <> 0 OR rs_assignment-profit_center IS INITIAL.
-      SELECT SINGLE kostl, aufnr, prctr
+*      SELECT SINGLE kostl, aufnr, prctr
+      SELECT kostl, aufnr, prctr
         FROM /eacm/zpr13
         WHERE kokrs = @is_config-kokrs
           AND vkorg = @is_zprdp-vkorg
           AND zclpr = @is_zprdp-zclpr
+          ORDER BY kostl
         INTO (@rs_assignment-cost_center,
               @rs_assignment-order_number,
-              @rs_assignment-profit_center).
+              @rs_assignment-profit_center)
+        UP TO 1 ROWS.
+      ENDSELECT.
     ENDIF.
+
+        "EM aggiunto 17/9/2026
+    IF sy-subrc <> 0.
+      SELECT kostl, aufnr, prctr
+        FROM /eacm/zpr13
+        WHERE kokrs = @is_config-kokrs
+          AND vkorg = @is_zprdp-vkorg
+          ORDER BY kostl
+        INTO (@rs_assignment-cost_center,
+              @rs_assignment-order_number,
+              @rs_assignment-profit_center)
+        UP TO 1 ROWS.
+      ENDSELECT.    ENDIF.
   ENDMETHOD.
 
   METHOD determine_business_area.
@@ -1053,6 +1156,61 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
 
     DATA(lv_abs_amount) = abs( is_group-amount ).
 
+"Codice speciale -> il cost center non deve essere passato
+    IF is_group-accounts-accrual_account IS NOT INITIAL
+       AND is_group-accounts-accrual_special_gl IS NOT INITIAL
+       AND is_group-accounts-maturity_account IS INITIAL
+       AND is_group-accounts-maturity_special_gl IS NOT INITIAL.
+      "Reclassify the MDE supplier item from ZCPTS_CS to ZCPPM_CS.
+      "ZCPTS is the offsetting account for both supplier postings.
+      APPEND VALUE /eacm/cl_eacm_journal_post_api=>ty_gl_item(
+        supplier          = is_group-supplier
+        special_gl_code   = is_group-accounts-maturity_special_gl
+        amount            = lv_abs_amount
+        currency_code     = is_group-currency
+        debit_credit_code = COND #( WHEN is_group-amount < 0 THEN 'S' ELSE 'H' )
+        assignment_ref    = is_group-assignment_number
+        tax_code          = is_group-accounts-tax_code
+        item_text         = is_group-item_text ) TO ls_request-items.
+
+      APPEND VALUE /eacm/cl_eacm_journal_post_api=>ty_gl_item(
+        gl_account        = is_group-accounts-accrual_account
+        amount            = lv_abs_amount
+        currency_code     = is_group-currency
+        debit_credit_code = COND #( WHEN is_group-amount < 0 THEN 'H' ELSE 'S' )
+        assignment_ref    = is_group-assignment_number
+        tax_code          = is_group-accounts-tax_code
+        cost_center       = ' '
+"Codice speciale -> il cost center non deve essere passato
+*        cost_center       = is_group-assignment-cost_center
+        order_number      = is_group-assignment-order_number
+        profit_center     = is_group-assignment-profit_center
+        item_text         = is_group-item_text ) TO ls_request-items.
+
+      APPEND VALUE /eacm/cl_eacm_journal_post_api=>ty_gl_item(
+        supplier          = is_group-supplier
+        special_gl_code   = is_group-accounts-accrual_special_gl
+        amount            = lv_abs_amount
+        currency_code     = is_group-currency
+        debit_credit_code = COND #( WHEN is_group-amount < 0 THEN 'H' ELSE 'S' )
+        assignment_ref    = is_group-assignment_number
+        tax_code          = is_group-accounts-tax_code
+        item_text         = is_group-item_text ) TO ls_request-items.
+
+      APPEND VALUE /eacm/cl_eacm_journal_post_api=>ty_gl_item(
+        gl_account        = is_group-accounts-accrual_account
+        amount            = lv_abs_amount
+        currency_code     = is_group-currency
+        debit_credit_code = COND #( WHEN is_group-amount < 0 THEN 'S' ELSE 'H' )
+        assignment_ref    = is_group-assignment_number
+        tax_code          = is_group-accounts-tax_code
+        cost_center       = ' '
+"Codice speciale -> il cost center non deve essere passato
+*        cost_center       = is_group-assignment-cost_center
+        order_number      = is_group-assignment-order_number
+        profit_center     = is_group-assignment-profit_center
+        item_text         = is_group-item_text ) TO ls_request-items.
+    ELSE.
     APPEND VALUE /eacm/cl_eacm_journal_post_api=>ty_gl_item(
       gl_account        = is_group-accounts-accrual_account
       supplier          = COND #( WHEN is_group-accounts-accrual_account IS INITIAL
@@ -1064,9 +1222,13 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       debit_credit_code = COND #( WHEN is_group-amount < 0 THEN 'H' ELSE 'S' )
       assignment_ref    = is_group-assignment_number
       "EM: aggiunto
-      tax_code          = 'KZ' "is_group-accounts-tax_code
+      tax_code          = is_group-accounts-tax_code  " 'KZ'
+      "EM: aggiunti 17/9/26
+      cost_center       = is_group-assignment-cost_center
+      order_number      = is_group-assignment-order_number
+      profit_center     = is_group-assignment-profit_center
       item_text         = COND #( WHEN is_group-item_text IS INITIAL THEN 'eACM - MTE Maturande' ELSE is_group-item_text ) )
-      TO ls_request-items.
+      TO ls_request-items .
 
     APPEND VALUE /eacm/cl_eacm_journal_post_api=>ty_gl_item(
       gl_account        = is_group-accounts-maturity_account
@@ -1079,37 +1241,52 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       debit_credit_code = COND #( WHEN is_group-amount < 0 THEN 'S' ELSE 'H' )
       assignment_ref    = is_group-assignment_number
       "EM: aggiunto
-      tax_code          = 'KZ' "is_group-accounts-tax_code
+      tax_code          = is_group-accounts-tax_code "'KZ'
+      "EM: aggiunti 17/9/26
+      cost_center       = is_group-assignment-cost_center
+      order_number      = is_group-assignment-order_number
+      profit_center     = is_group-assignment-profit_center
       item_text         = COND #( WHEN is_group-item_text IS INITIAL THEN 'eACM - MTE Maturate' ELSE is_group-item_text ) )
       TO ls_request-items.
+    ENDIF.
 
     DATA(ls_response) = NEW /eacm/cl_eacm_journal_post_api( )->post_journal_entry( ls_request ).
-    DATA(lv_detail_type) = COND symsgty(
-      WHEN ls_response-success = abap_false THEN gc_msg_error
-      ELSE 'I' ).
-
-    LOOP AT ls_response-message_details INTO DATA(lv_detail).
-      append_message(
-        EXPORTING
-          iv_type = lv_detail_type
-          iv_text = lv_detail
-          iv_agent = is_group-agent
-        CHANGING
-          ct_result = ct_result ).
-    ENDLOOP.
 
     IF ls_response-success = abap_false.
+      DATA(lv_api_error) = ``.
+      LOOP AT ls_response-message_details INTO DATA(lv_error_detail).
+        CHECK lv_error_detail IS NOT INITIAL.
+        lv_api_error = COND #(
+          WHEN lv_api_error IS INITIAL THEN lv_error_detail
+          ELSE |{ lv_api_error }; { lv_error_detail }| ).
+      ENDLOOP.
+
+      IF lv_api_error IS INITIAL.
+        lv_api_error = COND #(
+          WHEN ls_response-message_text IS INITIAL
+          THEN |Contabilizzazione MTE non riuscita per agente { is_group-agent }.|
+          ELSE ls_response-message_text ).
+      ENDIF.
+
       append_message(
         EXPORTING
           iv_type = gc_msg_error
-          iv_text = COND #( WHEN ls_response-message_text IS INITIAL
-                            THEN |Contabilizzazione MTE non riuscita per agente { is_group-agent }.|
-                            ELSE ls_response-message_text )
+          iv_text = lv_api_error
           iv_agent = is_group-agent
         CHANGING
           ct_result = ct_result ).
       RETURN.
     ENDIF.
+
+    LOOP AT ls_response-message_details INTO DATA(lv_detail).
+      append_message(
+        EXPORTING
+          iv_type = 'I'
+          iv_text = lv_detail
+          iv_agent = is_group-agent
+        CHANGING
+          ct_result = ct_result ).
+    ENDLOOP.
 
     rv_success = abap_true.
     APPEND VALUE #(
@@ -1150,6 +1327,15 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
 
 
   METHOD enqueue_status_requests.
+    DATA lt_status TYPE tt_job_status.
+    prepare_status_requests(
+      EXPORTING is_selection = is_selection
+      IMPORTING ev_count = rv_count
+                et_status = lt_status ).
+  ENDMETHOD.
+
+
+  METHOD prepare_status_requests.
     DATA lt_result TYPE tt_result.
     DATA lv_now TYPE /eacm/job_mte-changed_at.
     DATA lv_exists TYPE abap_bool.
@@ -1237,6 +1423,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
               accrual_special_gl    = @ls_status-accrual_special_gl,
               maturity_account      = @ls_status-maturity_account,
               maturity_special_gl   = @ls_status-maturity_special_gl,
+              tax_code              = @ls_status-tax_code,
               amount               = @ls_status-amount,
               source_count         = @ls_status-source_count,
               belnr                = '',
@@ -1257,12 +1444,17 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         ls_status-changed_at = lv_now.
         ls_status-last_message = 'Richiesta MTE pronta per contabilizzazione'.
         INSERT /eacm/job_mte FROM @ls_status.
+        IF sy-subrc <> 0.
+          RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+            EXPORTING iv_text = 'Impossibile creare lo stato della richiesta MTE.'.
+        ENDIF.
       ENDIF.
 
+      APPEND ls_status TO et_status.
       save_group_sources(
         iv_job_uuid = lv_job_uuid
         is_group    = ls_group ).
-      rv_count += 1.
+      ev_count += 1.
     ENDLOOP.
   ENDMETHOD.
 
@@ -1331,7 +1523,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         WHERE bukrs = @is_selection-company_code
           AND ( @lv_has_agent_range = @abap_false OR zcdaz IN @is_selection-agent_range )
           AND ( @lv_has_sales_org_range = @abap_false OR vkorg IN @is_selection-sales_org_range )
-          AND status <> 'C'.
+          AND status = 'I'.
     ELSE.
       UPDATE /eacm/job_mte
         SET status       = @iv_status,
@@ -1341,7 +1533,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         WHERE bukrs = @is_selection-company_code
           AND ( @lv_has_agent_range = @abap_false OR zcdaz IN @is_selection-agent_range )
           AND ( @lv_has_sales_org_range = @abap_false OR vkorg IN @is_selection-sales_org_range )
-          AND status <> 'C'.
+          AND status = 'I'.
     ENDIF.
   ENDMETHOD.
 
@@ -1351,13 +1543,16 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    IF is_status-status = 'W'
+    IF iv_direct = abap_false
+       AND is_status-status = 'W'
        AND recover_in_process_status( is_status ) = abap_true.
       RETURN.
     ENDIF.
 
     mark_status_in_process( is_status ).
-    COMMIT WORK AND WAIT.
+    IF iv_direct = abap_false.
+      COMMIT WORK AND WAIT.
+    ENDIF.
 
     DATA(ls_selection) = VALUE ty_selection(
       company_code             = is_status-bukrs
@@ -1372,22 +1567,65 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       external_reference       = is_status-xblnr
       defer_status_update      = abap_true ).
 
-    DATA(ls_group) = build_group_from_status( is_status ).
-    IF ls_group-source_rows IS INITIAL.
-      mark_status_error(
-        is_status  = is_status
-        iv_message = 'Nessuna riga sorgente MTE collegata alla richiesta.' ).
-      COMMIT WORK AND WAIT.
-      RETURN.
-    ENDIF.
-
+    DATA(lv_phase) = `Ricostruzione richiesta MTE`.
     TRY.
+        DATA(ls_group) = build_group_from_status( is_status ).
+        IF ls_group-source_rows IS INITIAL.
+          mark_status_error(
+            is_status  = is_status
+            iv_message = 'Nessuna riga sorgente MTE collegata alla richiesta.' ).
+          IF iv_direct = abap_true.
+            append_message(
+              EXPORTING
+                iv_type = gc_msg_error
+                iv_text = 'Nessuna riga sorgente MTE collegata alla richiesta.'
+                iv_agent = is_status-zcdaz
+              CHANGING ct_result = rt_result ).
+          ENDIF.
+          IF iv_direct = abap_false.
+            COMMIT WORK AND WAIT.
+          ENDIF.
+          RETURN.
+        ENDIF.
+
+        IF iv_direct = abap_true.
+          lv_phase = `Verifica documento contabile MTE esistente`.
+          DATA(ls_existing_document) = read_existing_document(
+            iv_bukrs = is_status-bukrs
+            iv_gjahr = is_status-xblnr_gjahr
+            iv_xblnr = is_status-xblnr ).
+          IF ls_existing_document-exists = abap_true.
+            DATA(lv_recovery_message) =
+              |Documento contabile MTE gia esistente: { ls_existing_document-accounting_document }|.
+            mark_status_accounted(
+              is_status              = is_status
+              iv_message             = lv_recovery_message
+              iv_accounting_document = ls_existing_document-accounting_document
+              iv_fiscal_year         = ls_existing_document-fiscal_year ).
+            APPEND VALUE #(
+              type                = gc_msg_success
+              message_text        = lv_recovery_message
+              accounting_document = ls_existing_document-accounting_document
+              fiscal_year         = ls_existing_document-fiscal_year
+              company_code        = is_status-bukrs
+              sales_org           = is_status-vkorg
+              agent               = is_status-zcdaz
+              currency            = is_status-waers
+              amount              = is_status-amount
+              source_count        = is_status-source_count
+              success             = abap_true ) TO rt_result.
+            RETURN.
+          ENDIF.
+        ENDIF.
+
+        lv_phase = `Chiamata API contabilizzazione MTE`.
         IF post_group(
              EXPORTING
                is_selection = ls_selection
                is_group     = ls_group
              CHANGING
                ct_result    = rt_result ) = abap_true.
+          lv_phase = `Aggiornamento stato contabilizzato MTE`.
           READ TABLE rt_result INTO DATA(ls_success) WITH KEY success = abap_true.
           mark_status_accounted(
             is_status              = is_status
@@ -1395,18 +1633,39 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
             iv_accounting_document = ls_success-accounting_document
             iv_fiscal_year         = ls_success-fiscal_year ).
         ELSE.
+          lv_phase = `Salvataggio messaggi API MTE`.
           mark_status_error(
             is_status  = is_status
             iv_message = build_error_message( rt_result ) ).
         ENDIF.
       CATCH cx_root INTO DATA(lx_error).
+        DATA(lv_error_message) = COND string(
+          WHEN line_exists( rt_result[ type = gc_msg_error ] )
+            OR line_exists( rt_result[ type = 'A' ] )
+            OR line_exists( rt_result[ type = 'X' ] )
+          THEN build_error_message( rt_result )
+          ELSE build_exception_message( lx_error ) ).
         mark_status_error(
           is_status  = is_status
-          iv_message = build_exception_message( lx_error ) ).
+          iv_message = |{ lv_phase }: { lv_error_message }| ).
+        IF iv_direct = abap_true AND rt_result IS INITIAL.
+          append_message(
+            EXPORTING
+              iv_type = gc_msg_error
+              iv_text = |{ lv_phase }: { lv_error_message }|
+              iv_agent = is_status-zcdaz
+            CHANGING ct_result = rt_result ).
+        ENDIF.
     ENDTRY.
 
-    /eacm/cl_api_log=>flush( ).
-    COMMIT WORK AND WAIT.
+    IF iv_direct = abap_false.
+      COMMIT WORK AND WAIT.
+      TRY.
+          /eacm/cl_api_log=>flush( ).
+        CATCH cx_root.
+          /eacm/cl_api_log=>discard( ).
+      ENDTRY.
+    ENDIF.
   ENDMETHOD.
 
 
@@ -1453,6 +1712,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       accrual_special_gl    = is_group-accounts-accrual_special_gl
       maturity_account      = is_group-accounts-maturity_account
       maturity_special_gl   = is_group-accounts-maturity_special_gl
+      tax_code              = is_group-accounts-tax_code
       amount                = is_group-amount
       source_count          = lines( is_group-source_rows )
       xblnr                 = lv_uuid_c32(16)
@@ -1501,6 +1761,10 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         job_uuid   = iv_job_uuid
         created_at = lv_now ).
       INSERT /eacm/job_mtesrc FROM @ls_source_status.
+      IF sy-subrc <> 0.
+        RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+          EXPORTING iv_text = |Impossibile collegare la riga MTE { ls_source-vbeln }/{ ls_source-posnr } alla richiesta.|.
+      ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
@@ -1548,6 +1812,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
     rs_group-accounts-accrual_special_gl = is_status-accrual_special_gl.
     rs_group-accounts-maturity_account = is_status-maturity_account.
     rs_group-accounts-maturity_special_gl = is_status-maturity_special_gl.
+    rs_group-accounts-tax_code = is_status-tax_code.
     rs_group-assignment-business_area = is_status-business_area.
     rs_group-assignment-cost_center = is_status-cost_center.
     rs_group-assignment-order_number = is_status-order_number.
@@ -1559,7 +1824,8 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       INTO TABLE @DATA(lt_source_keys).
 
     LOOP AT lt_source_keys INTO DATA(ls_key).
-      SELECT SINGLE *
+*      SELECT SINGLE *
+      SELECT  *
         FROM /eacm/zprdp
         WHERE bukrs = @ls_key-bukrs
           AND vkorg = @ls_key-vkorg
@@ -1571,7 +1837,10 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
           AND zidag = @ls_key-zidag
           AND zidfs = @ls_key-zidfs
           AND zamcf = @ls_key-zamcf
-        INTO @DATA(ls_source).
+        ORDER BY bukrs
+        INTO @DATA(ls_source)
+        UP TO 1 ROWS.
+      ENDSELECT.
       IF sy-subrc = 0.
         APPEND ls_source TO rs_group-source_rows.
       ENDIF.
@@ -1644,8 +1913,12 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         iv_message             = 'Documento contabile MTE gia esistente: stato recuperato senza nuova contabilizzazione'
         iv_accounting_document = ls_document-accounting_document
         iv_fiscal_year         = ls_document-fiscal_year ).
-      /eacm/cl_api_log=>flush( ).
       COMMIT WORK AND WAIT.
+      TRY.
+          /eacm/cl_api_log=>flush( ).
+        CATCH cx_root.
+          /eacm/cl_api_log=>discard( ).
+      ENDTRY.
       rv_recovered = abap_true.
     ENDIF.
   ENDMETHOD.
@@ -1692,11 +1965,24 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
 
   METHOD build_exception_message.
     DATA lo_error TYPE REF TO cx_root.
-    DATA lv_primary_text TYPE string.
-
     lo_error = ix_error.
 
     WHILE lo_error IS BOUND.
+      DATA(lo_type) = cl_abap_typedescr=>describe_by_object_ref( lo_error ).
+      lo_error->get_source_position(
+        IMPORTING
+          program_name = DATA(lv_program)
+          include_name = DATA(lv_include)
+          source_line  = DATA(lv_line) ).
+      DATA(lv_origin) = COND string(
+        WHEN lv_include IS INITIAL THEN lv_program
+        ELSE lv_include ).
+      DATA(lv_location) = |{ lo_type->absolute_name } in { lv_origin }:{ lv_line }|.
+      rv_message = COND #(
+        WHEN rv_message IS INITIAL
+        THEN |User { sy-uname }; { lv_location }|
+        ELSE |{ rv_message }; { lv_location }| ).
+
       IF lo_error IS INSTANCE OF /eacm/cx_api_error.
         DATA(lx_api_error) = CAST /eacm/cx_api_error( lo_error ).
         IF lx_api_error->mv_context IS NOT INITIAL
@@ -1710,10 +1996,6 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       ENDIF.
 
       DATA(lv_text) = lo_error->get_text( ).
-      IF lv_primary_text IS INITIAL.
-        lv_primary_text = lv_text.
-      ENDIF.
-
       IF lv_text IS NOT INITIAL
          AND ( rv_message IS INITIAL OR rv_message NS lv_text ).
         rv_message = COND #(
@@ -1722,14 +2004,8 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
           ELSE |{ rv_message }; { lv_text }| ).
       ENDIF.
 
-      lo_error = lo_error->previous.
-    ENDWHILE.
-
-    "Se non esiste una catena PREVIOUS, il long text puo contenere il dettaglio
-    "tecnico che GET_TEXT riduce al messaggio generico dell'eccezione wrapper.
-    IF ix_error IS BOUND
-       AND ix_error->previous IS NOT BOUND.
-      DATA(lv_longtext) = ix_error->get_longtext( ).
+      "Il testo lungo puo contenere il dettaglio anche nelle eccezioni PREVIOUS.
+      DATA(lv_longtext) = lo_error->get_longtext( ).
       REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline
         IN lv_longtext WITH ` `.
       REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>cr_lf
@@ -1737,14 +2013,16 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       CONDENSE lv_longtext.
 
       IF lv_longtext IS NOT INITIAL
-         AND lv_longtext <> lv_primary_text
+         AND lv_longtext <> lv_text
          AND ( rv_message IS INITIAL OR rv_message NS lv_longtext ).
         rv_message = COND #(
           WHEN rv_message IS INITIAL
           THEN lv_longtext
           ELSE |{ rv_message }; { lv_longtext }| ).
       ENDIF.
-    ENDIF.
+
+      lo_error = lo_error->previous.
+    ENDWHILE.
 
     IF rv_message IS INITIAL.
       rv_message = 'Eccezione non identificata durante la contabilizzazione MTE.'.
@@ -1752,6 +2030,9 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
+
+
 
 
 

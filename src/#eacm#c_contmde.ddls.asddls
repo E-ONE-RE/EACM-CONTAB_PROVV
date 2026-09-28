@@ -55,8 +55,8 @@ define root view entity /EACM/C_CONTMDE
   }
   BillingDocumentDate,
   @EndUserText: {
-    label: 'Date record alloc.', 
-    quickInfo: 'Date of record allocation'
+    label: 'Posting Date', 
+    quickInfo: 'Posting Date'
   }
   PostingDate,
   @EndUserText: {
@@ -97,7 +97,7 @@ define root view entity /EACM/C_CONTMDE
   }
   AccrualAmountSigned,
   
-  IsToday,
+//  IsToday,
   
   _BaseEntity
 }

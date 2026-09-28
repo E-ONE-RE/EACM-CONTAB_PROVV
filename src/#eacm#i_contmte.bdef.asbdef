@@ -10,5 +10,7 @@ authorization master ( global )
 static action PostMte
   parameter /eacm/a_mte_post_input
   result [1] /eacm/a_mde_action_result;
-
+static action PostMteDirect
+  parameter /eacm/a_mte_post_input
+  result [1] /eacm/a_mde_action_result;
 }

@@ -41,17 +41,17 @@ define root view entity /EACM/I_CONTMDE
         when DocSign.zsegn = '-1'
           then Prdo.zimst * -1
         else Prdo.zimst
-      end as AccrualAmountSigned,
+      end as AccrualAmountSigned
       
 
-      cast(
-          case
-            when Prdo.budat = $session.system_date
-            then 'X'
-            else ''
-          end
-          as /eacm/istoday
-        ) as IsToday
+//      cast(
+//          case
+//            when Prdo.budat = $session.system_date
+//            then 'X'
+//            else ''
+//          end
+//          as /eacm/istoday
+//        ) as IsToday
  
 }
 where

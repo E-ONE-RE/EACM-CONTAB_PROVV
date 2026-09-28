@@ -122,6 +122,10 @@ CLASS /eacm/cl_mde_posting DEFINITION
         source_rows       TYPE tt_prdo,
       END OF ty_group,
       tt_group TYPE STANDARD TABLE OF ty_group WITH EMPTY KEY.
+    "Preparazione non simulata riutilizzata dalla stessa istanza nel save RAP.
+    DATA mt_prepared_groups TYPE tt_group.
+    DATA ms_prepared_selection TYPE ty_selection.
+    DATA mv_prepared TYPE abap_bool.
 
     TYPES:
       BEGIN OF ty_existing_document,
@@ -351,7 +355,9 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
             ct_result = rt_result ).
         CONTINUE.
       ENDIF.
-
+**************
+"ATTENZIONE! QUI SCRIVE LA SCRITTURA CONTABILE
+**************
       IF post_group(
            EXPORTING
              is_selection = is_selection
@@ -491,11 +497,20 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
     lv_has_payment_range = xsdbool( is_selection-payment_type_range IS NOT INITIAL ).
 
     SELECT *  "#EC CI_ALL_FIELDS_NEEDED
-      FROM /eacm/prdo
+      FROM /eacm/prdo AS prdo
       WHERE bukrs = @is_selection-company_code
+********
+" EM 14/9/26 aggiunto
+        " MDE (/EACM/STA): eligible classes, excluding ZRIPR; ZANT is ignored.
+        AND zclpr IN ( SELECT zclpr FROM /eacm/zpr08
+                         WHERE bukrs = @is_selection-company_code
+                           AND zcapr = 'X'
+                           AND zripr <> 'X' )
+******
         AND zstre <> 'D'
         AND budat = @gc_zero_date
         AND zimst = 0
+        AND NOT ( prdo~zmodi = 'M' AND prdo~zimst = prdo~zimco )
         AND fkdat IN @is_selection-document_date_range
         AND ( @lv_has_payment_range = @abap_false OR ztpag IN @is_selection-payment_type_range )
         AND ( @lv_has_agent_range = @abap_false OR zcdaz IN @is_selection-agent_range )
@@ -504,19 +519,6 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
         AND ( @lv_has_billing_range = @abap_false OR vbeln IN @is_selection-billing_document_range )
       ORDER BY bukrs, vkorg, zcdaz, vbeln, posnr
       INTO TABLE @rt_prdo.
-
-    DATA lt_prdo_filtered TYPE tt_prdo.
-
-    LOOP AT rt_prdo INTO DATA(ls_prdo).
-      IF ls_prdo-zmodi = 'M'
-         AND ls_prdo-zimst = ls_prdo-zimco.
-        CONTINUE.
-      ENDIF.
-
-      APPEND ls_prdo TO lt_prdo_filtered.
-    ENDLOOP.
-
-    rt_prdo = lt_prdo_filtered.
 
   ENDMETHOD.
 
@@ -570,7 +572,8 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
         AND zstre <> 'S'
         AND ( @lv_has_payment_range = @abap_false OR ztpag IN @is_selection-payment_type_range )
       ORDER BY erdat DESCENDING
-      INTO TABLE @lt_agent.
+      INTO TABLE @lt_agent
+      UP TO 1 ROWS.
 
     READ TABLE lt_agent INTO rs_agent INDEX 1.
   ENDMETHOD.
@@ -633,14 +636,18 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
 
     IF rs_accounts-provision_account IS INITIAL
        AND rs_accounts-provision_special_gl IS INITIAL.
-      SELECT SINGLE zcpts, zcpts_cs, mwskz
+*      SELECT SINGLE zcpts, zcpts_cs, mwskz
+      SELECT zcpts, zcpts_cs, mwskz
         FROM /eacm/zprsp
         WHERE bukrs = @is_prdo-bukrs
           AND ztpag = @is_prdo-ztpag
           AND waerk = @is_prdo-waerk
+          ORDER by zcpts
         INTO (@rs_accounts-provision_account,
               @rs_accounts-provision_special_gl,
-              @rs_accounts-tax_code).
+              @rs_accounts-tax_code)
+        UP TO 1 ROWS.
+      ENDSELECT.
     ENDIF.
 
     IF rs_accounts-cost_account IS INITIAL.
@@ -695,29 +702,41 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
       INTO (@DATA(lv_kostl), @DATA(lv_aufnr), @DATA(lv_prctr)).
 
     IF sy-subrc <> 0.
-      SELECT SINGLE kostl, aufnr, prctr
+*      SELECT SINGLE kostl, aufnr, prctr
+      SELECT kostl, aufnr, prctr
         FROM /eacm/zpr13
         WHERE kokrs = @is_config-kokrs
           AND vkorg = @is_prdo-vkorg
           AND zcdaz = @is_prdo-zcdaz
-        INTO (@lv_kostl, @lv_aufnr, @lv_prctr).
+          order by kostl
+        INTO (@lv_kostl, @lv_aufnr, @lv_prctr)
+        UP TO 1 ROWS.
+      ENDSELECT.
     ENDIF.
 
     IF sy-subrc <> 0.
-      SELECT SINGLE kostl, aufnr, prctr
+*      SELECT SINGLE kostl, aufnr, prctr
+      SELECT kostl, aufnr, prctr
         FROM /eacm/zpr13
         WHERE kokrs = @is_config-kokrs
           AND vkorg = @is_prdo-vkorg
           AND zclpr = @is_prdo-zclpr
-        INTO (@lv_kostl, @lv_aufnr, @lv_prctr).
+          order by kostl
+        INTO (@lv_kostl, @lv_aufnr, @lv_prctr)
+        UP TO 1 ROWS.
+      endselect.
     ENDIF.
 
     IF sy-subrc <> 0.
-      SELECT SINGLE kostl, aufnr, prctr
+*      SELECT SINGLE kostl, aufnr, prctr
+      SELECT kostl, aufnr, prctr
         FROM /eacm/zpr13
         WHERE kokrs = @is_config-kokrs
           AND vkorg = @is_prdo-vkorg
-        INTO (@lv_kostl, @lv_aufnr, @lv_prctr).
+        ORDER BY kostl
+        INTO (@lv_kostl, @lv_aufnr, @lv_prctr)
+        UP TO 1 ROWS.
+      ENDSELECT.
     ENDIF.
 
     IF rs_assignment-cost_center IS INITIAL.
@@ -917,11 +936,31 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
     DATA lv_group_index TYPE sy-tabix.
     DATA lv_update_index TYPE sy-tabix.
 
+    "Cache locale: data di registrazione e filtri restano costanti nella chiamata.
+    "Memorizza anche gli agenti non trovati, evitando query ripetute.
+    TYPES:
+      BEGIN OF ty_agent_cache,
+        agent TYPE /eacm/zpraa-zcdaz,
+        payment_type TYPE /eacm/zpraa-ztpag,
+        result TYPE ty_agent,
+      END OF ty_agent_cache.
+    DATA lt_agent_cache TYPE HASHED TABLE OF ty_agent_cache
+      WITH UNIQUE KEY agent payment_type.
+    DATA ls_agent TYPE ty_agent.
+
     LOOP AT lt_prdo INTO DATA(ls_prdo).
-      DATA(ls_agent) = get_agent(
-        iv_agent     = ls_prdo-zcdaz
-        iv_agent_type = ls_prdo-ztpag
-        is_selection = ls_effective_selection ).
+      READ TABLE lt_agent_cache ASSIGNING FIELD-SYMBOL(<agent_cache>)
+        WITH TABLE KEY agent = ls_prdo-zcdaz payment_type = ls_prdo-ztpag.
+      IF sy-subrc = 0.
+        ls_agent = <agent_cache>-result.
+      ELSE.
+        ls_agent = get_agent(
+          iv_agent = ls_prdo-zcdaz
+          iv_agent_type = ls_prdo-ztpag
+          is_selection = ls_effective_selection ).
+        INSERT VALUE #( agent = ls_prdo-zcdaz payment_type = ls_prdo-ztpag
+                        result = ls_agent ) INTO TABLE lt_agent_cache.
+      ENDIF.
 
       IF ls_agent-agent IS INITIAL.
         append_message(
@@ -1044,6 +1083,10 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
 
     DATA(lv_abs_amount) = abs( is_group-amount ).
 
+    " No tax code on MDE items: accruing commissions are not VAT relevant, so the
+    " document must not carry one - sending it produced FF805 "Tax statement item
+    " missing for tax code KZ". The code is still read into ACCOUNTS-TAX_CODE from
+    " /EACM/ZPRSP, it is only the accrued side (MTE) that has to send it.
     APPEND VALUE /eacm/cl_eacm_journal_post_api=>ty_gl_item(
       gl_account        = is_group-accounts-cost_account
       amount            = lv_abs_amount
@@ -1052,8 +1095,9 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
       cost_center       = is_group-assignment-cost_center
       order_number      = is_group-assignment-order_number
       profit_center     = is_group-assignment-profit_center
-      tax_code          = is_group-accounts-tax_code
       assignment_ref    = is_group-assignment_number
+       "EM: aggiunto
+      tax_code          = is_group-accounts-tax_code  " 'KZ'
       item_text         = COND #( WHEN is_group-item_text IS INITIAL THEN 'eACM - MDE Cost' ELSE is_group-item_text ) )
       TO ls_request-items.
 
@@ -1066,8 +1110,9 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
       amount            = lv_abs_amount
       currency_code     = is_group-currency
       debit_credit_code = COND #( WHEN is_group-amount < 0 THEN 'S' ELSE 'H' )
-      tax_code          = is_group-accounts-tax_code
       assignment_ref    = is_group-assignment_number
+      "EM: aggiunto
+      tax_code          = is_group-accounts-tax_code  " 'KZ'
       item_text         = COND #( WHEN is_group-item_text IS INITIAL THEN 'eACM - MDE' ELSE is_group-item_text ) )
       TO ls_request-items.
 
@@ -1146,6 +1191,10 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    DATA lt_groups TYPE tt_group.
+    IF mv_prepared = abap_true AND ms_prepared_selection = is_selection.
+      lt_groups = mt_prepared_groups.
+    ELSE.
     IF validate(
          EXPORTING is_selection = is_selection
          CHANGING  ct_result    = lt_result ) = abap_false.
@@ -1156,7 +1205,7 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
     DATA(ls_config) = load_config(
       EXPORTING is_selection = is_selection
       CHANGING  ct_result    = lt_result ).
-    DATA(lt_groups) = collect_to_post(
+    lt_groups = collect_to_post(
       EXPORTING
         is_selection = is_selection
         is_config    = ls_config
@@ -1170,6 +1219,9 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
         EXPORTING iv_text = build_error_message( lt_result ).
     ENDIF.
 
+    ENDIF.
+    "Consuma la preparazione; i controlli sullo stato dei job restano nel save.
+    CLEAR: mv_prepared, mt_prepared_groups, ms_prepared_selection.
     GET TIME STAMP FIELD lv_now.
 
     LOOP AT lt_groups INTO DATA(ls_group).
@@ -1260,6 +1312,8 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
   METHOD count_status_requests.
     DATA lt_result TYPE tt_result.
 
+    CLEAR: mv_prepared, mt_prepared_groups, ms_prepared_selection.
+
     IF is_selection-test_run = abap_true.
       RETURN.
     ENDIF.
@@ -1288,6 +1342,9 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
         EXPORTING iv_text = build_error_message( lt_result ).
     ENDIF.
 
+    mt_prepared_groups = lt_groups.
+    ms_prepared_selection = is_selection.
+    mv_prepared = abap_true.
     LOOP AT lt_groups INTO DATA(ls_group).
       DATA(lv_job_uuid) = find_group_job( ls_group ).
       IF lv_job_uuid IS NOT INITIAL.
@@ -1533,27 +1590,22 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
     rs_group-assignment-order_number = is_status-order_number.
     rs_group-assignment-profit_center = is_status-profit_center.
 
-    SELECT *
-      FROM /eacm/job_mdesrc
-      WHERE job_uuid = @is_status-job_uuid
-      INTO TABLE @DATA(lt_source_keys).
-
-    LOOP AT lt_source_keys INTO DATA(ls_key).
-      SELECT SINGLE *
-        FROM /eacm/prdo
-        WHERE bukrs = @ls_key-bukrs
-          AND vkorg = @ls_key-vkorg
-          AND vtweg = @ls_key-vtweg
-          AND zclpr = @ls_key-zclpr
-          AND vbeln = @ls_key-vbeln
-          AND posnr = @ls_key-posnr
-          AND zcdaz = @ls_key-zcdaz
-          AND zidag = @ls_key-zidag
-        INTO @DATA(ls_source).
-      IF sy-subrc = 0.
-        APPEND ls_source TO rs_group-source_rows.
-      ENDIF.
-    ENDLOOP.
+    "Lettura unica delle sorgenti; EXISTS evita duplicati nelle chiavi del job.
+    SELECT p~*
+      FROM /eacm/prdo AS p
+      WHERE EXISTS (
+        SELECT *
+          FROM /eacm/job_mdesrc AS s
+          WHERE s~job_uuid = @is_status-job_uuid
+            AND s~bukrs = p~bukrs
+            AND s~vkorg = p~vkorg
+            AND s~vtweg = p~vtweg
+            AND s~zclpr = p~zclpr
+            AND s~vbeln = p~vbeln
+            AND s~posnr = p~posnr
+            AND s~zcdaz = p~zcdaz
+            AND s~zidag = p~zidag )
+      INTO TABLE @rs_group-source_rows.
   ENDMETHOD.
 
 
@@ -1675,4 +1727,7 @@ CLASS /EACM/CL_MDE_POSTING IMPLEMENTATION.
       agent = iv_agent ) TO ct_result.
   ENDMETHOD.
 ENDCLASS.
+
+
+
 

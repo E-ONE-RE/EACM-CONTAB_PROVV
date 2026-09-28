@@ -27,16 +27,23 @@ CLASS /eacm/cl_mde_posting_request DEFINITION
       RAISING /eacm/cx_eacm_posting.
 
   PRIVATE SECTION.
-    CLASS-DATA gt_pending_selection TYPE tt_selection.
+    TYPES:
+      BEGIN OF ty_pending,
+        selection TYPE /eacm/cl_mde_posting=>ty_selection,
+        service TYPE REF TO /eacm/cl_mde_posting,
+      END OF ty_pending,
+      tt_pending TYPE STANDARD TABLE OF ty_pending WITH EMPTY KEY.
+    CLASS-DATA gt_pending TYPE tt_pending.
 ENDCLASS.
 
 
 CLASS /eacm/cl_mde_posting_request IMPLEMENTATION.
 
   METHOD enqueue.
-    rv_count = NEW /eacm/cl_mde_posting( )->count_status_requests( is_selection ).
+    DATA(lo_service) = NEW /eacm/cl_mde_posting( ).
+    rv_count = lo_service->count_status_requests( is_selection ).
     IF rv_count > 0.
-      APPEND is_selection TO gt_pending_selection.
+      APPEND VALUE #( selection = is_selection service = lo_service ) TO gt_pending.
     ENDIF.
   ENDMETHOD.
 
@@ -45,16 +52,21 @@ CLASS /eacm/cl_mde_posting_request IMPLEMENTATION.
     DATA lt_pending_selection TYPE tt_selection.
     DATA lv_enqueued_count TYPE i.
     DATA lv_message TYPE string.
+    DATA ls_selection TYPE /eacm/cl_mde_posting=>ty_selection.
 
-    lt_pending_selection = gt_pending_selection.
-    CLEAR gt_pending_selection.
+    DATA(lt_pending) = gt_pending.
+    CLEAR gt_pending.
+    LOOP AT lt_pending INTO DATA(ls_pending_selection).
+      APPEND ls_pending_selection-selection TO lt_pending_selection.
+    ENDLOOP.
     IF lt_pending_selection IS INITIAL.
       RETURN.
     ENDIF.
 
     TRY.
-        LOOP AT lt_pending_selection INTO DATA(ls_selection).
-          lv_enqueued_count += NEW /eacm/cl_mde_posting( )->enqueue_status_requests( ls_selection ).
+        LOOP AT lt_pending INTO DATA(ls_pending).
+          lv_enqueued_count += ls_pending-service->enqueue_status_requests(
+            ls_pending-selection ).
         ENDLOOP.
 
         IF lv_enqueued_count > 0.
@@ -81,7 +93,7 @@ CLASS /eacm/cl_mde_posting_request IMPLEMENTATION.
 
 
   METHOD clear_pending.
-    CLEAR gt_pending_selection.
+    CLEAR gt_pending.
   ENDMETHOD.
 
 

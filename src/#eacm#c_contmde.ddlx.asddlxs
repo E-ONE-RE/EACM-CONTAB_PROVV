@@ -30,12 +30,12 @@ annotate view /EACM/C_CONTMDE with
           } ]
   CompanyCode;
   
-//  Default: visualizza quelle contabilizzate oggi
-  @UI.selectionField: [ {
-    position: 15 
-  } ]
-  @Consumption.filter.defaultValue: 'X'
-  IsToday;
+////  Default: visualizza quelle contabilizzate oggi
+//  @UI.selectionField: [ {
+//    position: 15 
+//  } ]
+//  @Consumption.filter.defaultValue: 'X'
+//  IsToday;
   
   @UI.identification: [ {
     position: 20 
@@ -133,8 +133,6 @@ annotate view /EACM/C_CONTMDE with
   @UI.selectionField: [ {
     position: 100 
   } ]
-
-
   PostingDate;
   
   @UI.identification: [ {

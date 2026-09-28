@@ -5,8 +5,14 @@
 @UI.headerInfo.description.value: 'CompanyCode'
 annotate view /EACM/C_CONTMTE with
 {
-@UI.lineItem: [{ type: #FOR_ACTION, dataAction: 'PostMte', label: 'Contabilizza MTE', position: 10 }]
-@UI.identification: [{ type: #FOR_ACTION, dataAction: 'PostMte', label: 'Contabilizza MTE', position: 10 }]
+@UI.lineItem: [
+  { type: #FOR_ACTION, dataAction: 'PostMte', label: 'Contabilizza MTE', position: 10 },
+  { type: #FOR_ACTION, dataAction: 'PostMteDirect', label: 'Contabilizza MTE direttamente', position: 11 }
+]
+@UI.identification: [
+  { type: #FOR_ACTION, dataAction: 'PostMte', label: 'Contabilizza MTE', position: 10 },
+  { type: #FOR_ACTION, dataAction: 'PostMteDirect', label: 'Contabilizza MTE direttamente', position: 11 }
+]
 
   @UI.facet: [ {
     label: 'General Information', 

@@ -18,7 +18,13 @@ CLASS /eacm/cl_mte_posting_request DEFINITION
       RETURNING VALUE(rv_count) TYPE i
       RAISING /eacm/cx_eacm_posting.
 
-    CLASS-METHODS save_pending.
+    CLASS-METHODS enqueue_direct
+      IMPORTING is_selection TYPE /eacm/cl_mte_posting=>ty_selection
+      RETURNING VALUE(rv_count) TYPE i
+      RAISING /eacm/cx_eacm_posting.
+
+    CLASS-METHODS save_pending
+      RETURNING VALUE(rt_direct_result) TYPE /eacm/cl_mte_posting=>tt_result.
     CLASS-METHODS clear_pending.
 
     CLASS-METHODS schedule_processing_job
@@ -29,6 +35,7 @@ CLASS /eacm/cl_mte_posting_request DEFINITION
 protected section.
   PRIVATE SECTION.
     CLASS-DATA gt_pending_selection TYPE tt_selection.
+    CLASS-DATA gt_pending_direct TYPE tt_selection.
 ENDCLASS.
 
 
@@ -44,18 +51,27 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD enqueue_direct.
+    rv_count = NEW /eacm/cl_mte_posting( )->count_status_requests( is_selection ).
+    IF rv_count > 0.
+      APPEND is_selection TO gt_pending_direct.
+    ENDIF.
+  ENDMETHOD.
+
+
   METHOD save_pending.
     DATA lt_pending_selection TYPE tt_selection.
+    DATA lt_pending_direct TYPE tt_selection.
     DATA lv_enqueued_count TYPE i.
     DATA lv_message TYPE string.
 
     lt_pending_selection = gt_pending_selection.
+    lt_pending_direct = gt_pending_direct.
     CLEAR gt_pending_selection.
-    IF lt_pending_selection IS INITIAL.
-      RETURN.
-    ENDIF.
+    CLEAR gt_pending_direct.
 
-    TRY.
+    IF lt_pending_selection IS NOT INITIAL.
+      TRY.
         LOOP AT lt_pending_selection INTO DATA(ls_selection).
           lv_enqueued_count += NEW /eacm/cl_mte_posting( )->enqueue_status_requests( ls_selection ).
         ENDLOOP.
@@ -79,12 +95,27 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
             iv_message   = lv_message
             iv_status    = 'E' ).
         ENDLOOP.
-    ENDTRY.
+      ENDTRY.
+    ENDIF.
+
+    " La chiamata diretta resta nella stessa richiesta RAP, ma le scritture
+    " e la chiamata di contabilizzazione avvengono nella save sequence.
+    LOOP AT lt_pending_direct INTO DATA(ls_direct_selection).
+      TRY.
+          DATA(lt_result) = NEW /eacm/cl_mte_posting( )->run_direct( ls_direct_selection ).
+          APPEND LINES OF lt_result TO rt_direct_result.
+        CATCH cx_root INTO DATA(lx_direct_error).
+          APPEND VALUE #(
+            type         = 'E'
+            message_text = lx_direct_error->get_text( ) ) TO rt_direct_result.
+      ENDTRY.
+    ENDLOOP.
   ENDMETHOD.
 
 
   METHOD clear_pending.
     CLEAR gt_pending_selection.
+    CLEAR gt_pending_direct.
   ENDMETHOD.
 
 
@@ -117,3 +148,4 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 ENDCLASS.
+

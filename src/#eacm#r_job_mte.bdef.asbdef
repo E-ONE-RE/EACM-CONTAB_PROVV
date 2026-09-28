@@ -59,6 +59,7 @@ authorization master( global )
     ProfitCenter = PROFIT_CENTER;
     AccrualAccount = ACCRUAL_ACCOUNT;
     MaturityAccount = MATURITY_ACCOUNT;
+    tax_code = TAX_CODE;
     Amount = AMOUNT;
     SourceCount = SOURCE_COUNT;
     Xblnr = XBLNR;

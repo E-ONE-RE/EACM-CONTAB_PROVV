@@ -6,7 +6,7 @@ CLASS /eacm/cl_mte_posting_apj DEFINITION
   PUBLIC SECTION.
     INTERFACES if_apj_rt_run.
     INTERFACES if_apj_dt_defaults.
-    DATA p_max TYPE i VALUE 20.
+    DATA p_max TYPE i VALUE 300.
 protected section.
 private section.
 ENDCLASS.
@@ -17,7 +17,7 @@ CLASS /EACM/CL_MTE_POSTING_APJ IMPLEMENTATION.
 
 
   METHOD if_apj_dt_defaults~fill_attribute_defaults.
-    p_max = 20.
+    p_max = 300.
   ENDMETHOD.
 
 
@@ -29,6 +29,7 @@ CLASS /EACM/CL_MTE_POSTING_APJ IMPLEMENTATION.
       FROM /eacm/job_mte
       WHERE status = 'I'
          OR status = 'W'
+         OR status = 'E'
       INTO @DATA(lv_more_requests).
 
     IF lv_more_requests = abap_true.
