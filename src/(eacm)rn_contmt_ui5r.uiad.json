@@ -1,14 +1,14 @@
 {
   "formatVersion": "2",
   "header": {
-    "description": "{{appDescription}}",
+    "description": "Accounting for commissions Maturate",
     "originalLanguage": "en",
     "abapLanguageVersion": "cloudDevelopment"
   },
   "generalInformation": {
     "appType": "ui5",
     "catalogId": "SAP_TC_UI5_REPO_UIAD",
-    "targetMappingTitle": "Contabilizzazione Provvigioni Maturate"
+    "targetMappingTitle": "Accounting for commissions Maturate"
   },
   "ui5AppDetails": {
     "appId": "zpd_contmte"
@@ -27,7 +27,7 @@
       "tileType": "static",
       "isDefault": true,
       "standard": {
-        "title": "Contabilizzazione Provvigioni Maturate"
+        "title": "Accounting for commissions Maturate"
       }
     }
   ]

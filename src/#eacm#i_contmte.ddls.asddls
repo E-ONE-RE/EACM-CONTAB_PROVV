@@ -1,6 +1,6 @@
 @AbapCatalog.viewEnhancementCategory: [#NONE]
 @AccessControl.authorizationCheck: #NOT_REQUIRED
-@EndUserText.label: 'Maturate Contabilizzate'
+@EndUserText.label: 'Posted Commission Accruals'
 @Metadata.ignorePropagatedAnnotations: true
 define root view entity /EACM/I_CONTMTE
   as select from /eacm/zprdp as Mte

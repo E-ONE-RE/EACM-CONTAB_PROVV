@@ -80,6 +80,7 @@ CLASS /eacm/cl_mte_posting DEFINITION
         iv_direct TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(rt_result) TYPE tt_result.
 
+
   PRIVATE SECTION.
     METHODS prepare_status_requests
       IMPORTING is_selection TYPE ty_selection
@@ -148,6 +149,10 @@ CLASS /eacm/cl_mte_posting DEFINITION
         source_rows             TYPE tt_zprdp,
       END OF ty_group,
       tt_group TYPE STANDARD TABLE OF ty_group WITH EMPTY KEY.
+
+    TYPES tt_source_key TYPE SORTED TABLE OF /eacm/job_mtesrc
+      WITH UNIQUE KEY bukrs vkorg vtweg zclpr vbeln posnr zcdaz zidag zidfs zamcf.
+    TYPES tt_job_uuid TYPE STANDARD TABLE OF sysuuid_x16 WITH EMPTY KEY.
 
     TYPES:
       BEGIN OF ty_existing_document,
@@ -280,7 +285,17 @@ CLASS /eacm/cl_mte_posting DEFINITION
 
     METHODS find_group_job
       IMPORTING is_group TYPE ty_group
-      RETURNING VALUE(rv_job_uuid) TYPE sysuuid_x16.
+      RETURNING VALUE(rv_job_uuid) TYPE sysuuid_x16
+      RAISING /eacm/cx_eacm_posting.
+
+    METHODS build_source_key
+      IMPORTING is_source TYPE /eacm/zprdp
+      RETURNING VALUE(rs_key) TYPE /eacm/job_mtesrc.
+
+    METHODS resolve_group_jobs
+      IMPORTING it_groups TYPE tt_group
+      RETURNING VALUE(rt_jobs) TYPE tt_job_uuid
+      RAISING /eacm/cx_eacm_posting.
 
     METHODS build_group_from_status
       IMPORTING is_status TYPE /eacm/job_mte
@@ -1067,22 +1082,22 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         CONTINUE.
       ENDIF.
 
-      DATA lv_legacy_text TYPE c LENGTH 50.
-      CONCATENATE ls_zprdp-zamco ls_zprdp-zidfs INTO lv_legacy_text.
+*      DATA lv_legacy_text TYPE c LENGTH 50.
+*      CONCATENATE ls_zprdp-zamco ls_zprdp-zidfs INTO lv_legacy_text.
 
       CLEAR lv_group_index.
       LOOP AT rt_group INTO ls_group
         WHERE company_code      = ls_zprdp-bukrs
           AND sales_org         = ls_zprdp-vkorg
           AND distribution_chan = ls_zprdp-vtweg
-          AND commission_class  = ls_zprdp-zclpr
+*          AND commission_class  = ls_zprdp-zclpr
           AND agent             = ls_zprdp-zcdaz
           AND payment_type      = ls_prdo-payment_type
           AND currency          = lv_currency
           AND business_area     = ls_assignment-business_area
           AND supplier          = ls_agent-supplier
           AND facsimile_period  = ls_zprdp-zamcf
-          AND legacy_text_seed  = lv_legacy_text.
+          AND facsimile_progressive = ls_zprdp-zidfs.
         IF ls_group-accounts = ls_accounts
            AND ls_group-assignment = ls_assignment.
           lv_group_index = sy-tabix.
@@ -1104,7 +1119,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
           supplier              = ls_agent-supplier
           facsimile_period      = ls_zprdp-zamcf
           facsimile_progressive = ls_zprdp-zidfs
-          legacy_text_seed      = lv_legacy_text
+*          legacy_text_seed      = lv_legacy_text
           accounts              = ls_accounts
           assignment            = ls_assignment ) TO rt_group.
         lv_group_index = lines( rt_group ).
@@ -1133,6 +1148,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD post_group.
+
     rv_success = abap_false.
 
     DATA(lv_blart) = COND blart(
@@ -1261,12 +1277,20 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
           ELSE |{ lv_api_error }; { lv_error_detail }| ).
       ENDLOOP.
 
-      IF lv_api_error IS INITIAL.
+
+      IF lv_api_error IS INITIAL
+         OR lv_api_error = 'An exception was raised.'.
         lv_api_error = COND #(
           WHEN ls_response-message_text IS INITIAL
           THEN |Contabilizzazione MTE non riuscita per agente { is_group-agent }.|
           ELSE ls_response-message_text ).
       ENDIF.
+
+      IF lv_api_error = 'An exception was raised.'.
+        lv_api_error = |MTE { is_group-agent }, utente { sy-uname }: { lv_api_error }|.
+      ENDIF.
+
+
 
       append_message(
         EXPORTING
@@ -1303,6 +1327,14 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
       amount              = is_group-amount
       source_count        = lines( is_group-source_rows )
       success             = abap_true ) TO ct_result.
+
+*    add_status_to_log(
+*                 io_log  = lo_log
+*                  iv_text = ls_response-message_text ).
+*
+*********************
+*    save_log( lo_log ).
+*********************
   ENDMETHOD.
 
   METHOD mark_group_posted.
@@ -1339,6 +1371,7 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
     DATA lt_result TYPE tt_result.
     DATA lv_now TYPE /eacm/job_mte-changed_at.
     DATA lv_exists TYPE abap_bool.
+    DATA ls_existing_status TYPE /eacm/job_mte.
 
     IF is_selection-test_run = abap_true.
       RETURN.
@@ -1369,19 +1402,35 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         EXPORTING iv_text = build_error_message( lt_result ).
     ENDIF.
 
+    " Risolve tutti i collegamenti prima di scrivere testate o dettagli.
+    " Un retry non deve scegliere l'UUID dalla sola prima riga del gruppo.
+    DATA(lt_group_jobs) = resolve_group_jobs( lt_groups ).
+    DATA lv_job_uuid TYPE sysuuid_x16.
+
     GET TIME STAMP FIELD lv_now.
 
     LOOP AT lt_groups INTO DATA(ls_group).
-      DATA(lv_job_uuid) = find_group_job( ls_group ).
+      READ TABLE lt_group_jobs INDEX sy-tabix INTO lv_job_uuid.
 
       IF lv_job_uuid IS NOT INITIAL.
-        SELECT SINGLE status
+        CLEAR ls_existing_status.
+        SELECT SINGLE *
           FROM /eacm/job_mte
           WHERE job_uuid = @lv_job_uuid
-          INTO @DATA(lv_status).
+          INTO @ls_existing_status.
 
-        IF lv_status = 'I' OR lv_status = 'W' OR lv_status = 'C'.
+        IF sy-subrc <> 0.
+          RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+            EXPORTING iv_text = 'Testata della richiesta MTE collegata non trovata.'.
+        ENDIF.
+        IF ls_existing_status-status = 'I'
+           OR ls_existing_status-status = 'W'
+           OR ls_existing_status-status = 'C'.
           CONTINUE.
+        ENDIF.
+        IF ls_existing_status-status <> 'E'.
+          RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+            EXPORTING iv_text = |Stato richiesta MTE non ammesso al retry: { ls_existing_status-status }.|.
         ENDIF.
       ELSE.
         TRY.
@@ -1404,12 +1453,27 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
         INTO @lv_exists.
 
       IF lv_exists = abap_true.
+        ls_status-xblnr = ls_existing_status-xblnr.
+        ls_status-xblnr_gjahr = ls_existing_status-xblnr_gjahr.
         ls_status-changed_by = sy-uname.
         ls_status-changed_at = lv_now.
         ls_status-last_message = 'Richiesta MTE pronta per contabilizzazione'.
 
         UPDATE /eacm/job_mte
           SET status               = 'I',
+              bukrs                = @ls_status-bukrs,
+              vkorg                = @ls_status-vkorg,
+              vtweg                = @ls_status-vtweg,
+              zclpr                = @ls_status-zclpr,
+              zcdaz                = @ls_status-zcdaz,
+              ztpag                = @ls_status-ztpag,
+              waers                = @ls_status-waers,
+              zamcf                = @ls_status-zamcf,
+              zidfs                = @ls_status-zidfs,
+              business_area        = @ls_status-business_area,
+              cost_center          = @ls_status-cost_center,
+              order_number         = @ls_status-order_number,
+              profit_center        = @ls_status-profit_center,
               bldat                = @ls_status-bldat,
               budat                = @ls_status-budat,
               blart                = @ls_status-blart,
@@ -1431,12 +1495,15 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
               changed_by           = @sy-uname,
               changed_at           = @lv_now,
               last_message         = @ls_status-last_message
-          WHERE job_uuid = @lv_job_uuid.
+          WHERE job_uuid = @lv_job_uuid
+            AND status = 'E'.
+        IF sy-subrc <> 0.
+          RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+            EXPORTING iv_text = 'La richiesta MTE e cambiata durante il retry: ripetere la selezione.'.
+        ENDIF.
 
-        " Ricostruisce il dettaglio in caso di retry E, per recepire eventuali
-        " variazioni di configurazione o raggruppamento intervenute nel frattempo.
-        DELETE FROM /eacm/job_mtesrc
-          WHERE job_uuid = @lv_job_uuid.
+        " Conserva UUID, riferimento contabile e collegamenti gia presenti.
+        " save_group_sources aggiunge soltanto i collegamenti mancanti.
       ELSE.
         ls_status-created_by = sy-uname.
         ls_status-created_at = lv_now.
@@ -1639,12 +1706,12 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
             iv_message = build_error_message( rt_result ) ).
         ENDIF.
       CATCH cx_root INTO DATA(lx_error).
-        DATA(lv_error_message) = COND string(
-          WHEN line_exists( rt_result[ type = gc_msg_error ] )
-            OR line_exists( rt_result[ type = 'A' ] )
-            OR line_exists( rt_result[ type = 'X' ] )
-          THEN build_error_message( rt_result )
-          ELSE build_exception_message( lx_error ) ).
+        DATA(lv_error_message) = build_exception_message( lx_error ).
+        IF line_exists( rt_result[ type = gc_msg_error ] )
+           OR line_exists( rt_result[ type = 'A' ] )
+           OR line_exists( rt_result[ type = 'X' ] ).
+          lv_error_message = |{ lv_error_message }; { build_error_message( rt_result ) }|.
+        ENDIF.
         mark_status_error(
           is_status  = is_status
           iv_message = |{ lv_phase }: { lv_error_message }| ).
@@ -1723,71 +1790,185 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
   METHOD save_group_sources.
     DATA lv_now TYPE /eacm/job_mtesrc-created_at.
     GET TIME STAMP FIELD lv_now.
+    DATA lv_testata_job_uuid type /eacm/job_mte-job_uuid.
 
     LOOP AT is_group-source_rows INTO DATA(ls_source).
+      clear lv_testata_job_uuid.
+      DATA(ls_source_status) = build_source_key( ls_source ).
       SELECT SINGLE job_uuid
         FROM /eacm/job_mtesrc
-        WHERE bukrs = @ls_source-bukrs
-          AND vkorg = @ls_source-vkorg
-          AND vtweg = @ls_source-vtweg
-          AND zclpr = @ls_source-zclpr
-          AND vbeln = @ls_source-vbeln
-          AND posnr = @ls_source-posnr
-          AND zcdaz = @ls_source-zcdaz
-          AND zidag = @ls_source-zidag
-          AND zidfs = @ls_source-zidfs
-          AND zamcf = @ls_source-zamcf
+        WHERE bukrs = @ls_source_status-bukrs
+          AND vkorg = @ls_source_status-vkorg
+          AND vtweg = @ls_source_status-vtweg
+          AND zclpr = @ls_source_status-zclpr
+          AND vbeln = @ls_source_status-vbeln
+          AND posnr = @ls_source_status-posnr
+          AND zcdaz = @ls_source_status-zcdaz
+          AND zidag = @ls_source_status-zidag
+          AND zidfs = @ls_source_status-zidfs
+          AND zamcf = @ls_source_status-zamcf
         INTO @DATA(lv_existing_job_uuid).
 
       IF sy-subrc = 0.
-        IF lv_existing_job_uuid <> iv_job_uuid.
-          RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
-            EXPORTING iv_text = |Riga MTE { ls_source-vbeln }/{ ls_source-posnr } gia assegnata a un'altra richiesta.|.
-        ENDIF.
-        CONTINUE.
+         SELECT SINGLE job_uuid  FROM /eacm/job_mte
+         WHERE job_uuid = @lv_existing_job_uuid
+         INTO @lv_testata_job_uuid.
+
+         if lv_testata_job_uuid is not initial. "Esiste anche la testata -> errore
+            IF lv_existing_job_uuid <> iv_job_uuid.
+              RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+                EXPORTING iv_text = |Riga MTE { ls_source-vbeln }/{ ls_source-posnr } gia assegnata a un'altra richiesta.|.
+            ENDIF.
+            CONTINUE.
+        endif.
       ENDIF.
 
-      DATA(ls_source_status) = VALUE /eacm/job_mtesrc(
-        bukrs      = ls_source-bukrs
-        vkorg      = ls_source-vkorg
-        vtweg      = ls_source-vtweg
-        zclpr      = ls_source-zclpr
-        vbeln      = ls_source-vbeln
-        posnr      = ls_source-posnr
-        zcdaz      = ls_source-zcdaz
-        zidag      = ls_source-zidag
-        zidfs      = ls_source-zidfs
-        zamcf      = ls_source-zamcf
-        job_uuid   = iv_job_uuid
-        created_at = lv_now ).
-      INSERT /eacm/job_mtesrc FROM @ls_source_status.
-      IF sy-subrc <> 0.
-        RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
-          EXPORTING iv_text = |Impossibile collegare la riga MTE { ls_source-vbeln }/{ ls_source-posnr } alla richiesta.|.
-      ENDIF.
+" Se ha trovato la riga su /eacm/job_mtesrc ma non ha la testata -> la sovrascrive,
+" se non l'ha trovata ->  la inserisce
+    if lv_testata_job_uuid is INITIAL.
+          ls_source_status-job_uuid = iv_job_uuid.
+          ls_source_status-created_at = lv_now.
+        "  INSERT /eacm/job_mtesrc FROM @ls_source_status.
+          MODIFY /eacm/job_mtesrc FROM @ls_source_status.
+          IF sy-subrc <> 0.
+            RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+              EXPORTING iv_text = |Impossibile collegare la riga MTE { ls_source-vbeln }/{ ls_source-posnr } alla richiesta.|.
+          ENDIF.
+      endif.
     ENDLOOP.
   ENDMETHOD.
 
 
   METHOD find_group_job.
-    READ TABLE is_group-source_rows INTO DATA(ls_source) INDEX 1.
-    IF sy-subrc <> 0.
+    DATA lt_keys TYPE tt_source_key.
+    DATA lv_linked_count TYPE i.
+    DATA lv_existing_job_uuid TYPE sysuuid_x16.
+
+    LOOP AT is_group-source_rows INTO DATA(ls_source).
+      DATA(ls_key) = build_source_key( ls_source ).
+      INSERT ls_key INTO TABLE lt_keys.
+      IF sy-subrc <> 0.
+        RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+          EXPORTING iv_text = |Chiave sorgente MTE duplicata nel gruppo per { ls_source-vbeln }/{ ls_source-posnr }: verificare la chiave e i tipi DDIC.|.
+      ENDIF.
+
+      CLEAR lv_existing_job_uuid.
+      SELECT SINGLE job_uuid
+        FROM /eacm/job_mtesrc
+        WHERE bukrs = @ls_key-bukrs
+          AND vkorg = @ls_key-vkorg
+          AND vtweg = @ls_key-vtweg
+          AND zclpr = @ls_key-zclpr
+          AND vbeln = @ls_key-vbeln
+          AND posnr = @ls_key-posnr
+          AND zcdaz = @ls_key-zcdaz
+          AND zidag = @ls_key-zidag
+          AND zidfs = @ls_key-zidfs
+          AND zamcf = @ls_key-zamcf
+          "ignoro i record "orfani"
+          AND job_uuid IN ( SELECT job_uuid FROM /eacm/job_mte )
+         INTO @lv_existing_job_uuid.
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+      IF lv_existing_job_uuid IS INITIAL.
+        RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+          EXPORTING iv_text = |Collegamento MTE senza UUID per { ls_source-vbeln }/{ ls_source-posnr }.|.
+      ENDIF.
+      lv_linked_count += 1.
+      IF rv_job_uuid IS INITIAL.
+        rv_job_uuid = lv_existing_job_uuid.
+      ELSEIF rv_job_uuid <> lv_existing_job_uuid.
+        RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+          EXPORTING iv_text = |Il gruppo MTE contiene richieste diverse ({ rv_job_uuid } e { lv_existing_job_uuid }), rilevate su { ls_source-vbeln }/{ ls_source-posnr }: ripristinare il raggruppamento originale prima del retry.|.
+      ENDIF.
+    ENDLOOP.
+
+    IF rv_job_uuid IS INITIAL.
       RETURN.
     ENDIF.
 
-    SELECT SINGLE job_uuid
-      FROM /eacm/job_mtesrc
-      WHERE bukrs = @ls_source-bukrs
-        AND vkorg = @ls_source-vkorg
-        AND vtweg = @ls_source-vtweg
-        AND zclpr = @ls_source-zclpr
-        AND vbeln = @ls_source-vbeln
-        AND posnr = @ls_source-posnr
-        AND zcdaz = @ls_source-zcdaz
-        AND zidag = @ls_source-zidag
-        AND zidfs = @ls_source-zidfs
-        AND zamcf = @ls_source-zamcf
-      INTO @rv_job_uuid.
+    SELECT SINGLE *
+      FROM /eacm/job_mte
+      WHERE job_uuid = @rv_job_uuid
+      INTO @DATA(ls_existing_status).
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+        EXPORTING iv_text = |Testata MTE { rv_job_uuid } non trovata per il gruppo selezionato.|.
+    ENDIF.
+
+    DATA(lv_status) = ls_existing_status-status.
+    IF lv_status = 'I' OR lv_status = 'W' OR lv_status = 'C'.
+      IF lv_linked_count <> lines( lt_keys ).
+        RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+          EXPORTING iv_text = |Gruppo MTE parzialmente collegato alla richiesta { rv_job_uuid } in stato { lv_status }: completare o verificare la richiesta prima di accodare altre righe.|.
+      ENDIF.
+      RETURN.
+    ENDIF.
+    IF lv_status <> 'E'.
+      RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+        EXPORTING iv_text = |Stato richiesta MTE { rv_job_uuid } non ammesso al retry: { lv_status }.|.
+    ENDIF.
+
+    IF ls_existing_status-source_count <> lines( lt_keys )
+       OR ls_existing_status-amount <> CONV /eacm/job_mte-amount( is_group-amount ).
+      RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+        EXPORTING iv_text = |Il gruppo MTE differisce dalla richiesta { rv_job_uuid } in errore per numero righe o importo: ripristinare la selezione originale prima del retry.|.
+    ENDIF.
+
+    " Non riutilizzare la testata E per una sola parte del vecchio documento.
+    " Il riferimento contabile deve continuare a identificare tutte le sue righe.
+    SELECT * FROM /eacm/job_mtesrc
+      WHERE job_uuid = @rv_job_uuid
+      INTO TABLE @DATA(lt_existing_keys).
+    LOOP AT lt_existing_keys INTO DATA(ls_existing_key).
+      IF NOT line_exists( lt_keys[
+        bukrs = ls_existing_key-bukrs vkorg = ls_existing_key-vkorg
+        vtweg = ls_existing_key-vtweg zclpr = ls_existing_key-zclpr
+        vbeln = ls_existing_key-vbeln posnr = ls_existing_key-posnr
+        zcdaz = ls_existing_key-zcdaz zidag = ls_existing_key-zidag
+        zidfs = ls_existing_key-zidfs zamcf = ls_existing_key-zamcf ] ).
+        RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+          EXPORTING iv_text = |Retry MTE incompleto per richiesta { rv_job_uuid }: manca { ls_existing_key-vbeln }/{ ls_existing_key-posnr }. Selezionare tutte le righe e ripristinare il raggruppamento originale.|.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD build_source_key.
+    " Ricerca e inserimento devono usare le stesse conversioni DDIC.
+    rs_key = VALUE #(
+      bukrs = is_source-bukrs vkorg = is_source-vkorg
+      vtweg = is_source-vtweg zclpr = is_source-zclpr
+      vbeln = is_source-vbeln posnr = is_source-posnr
+      zcdaz = is_source-zcdaz zidag = is_source-zidag
+      zidfs = is_source-zidfs zamcf = is_source-zamcf ).
+  ENDMETHOD.
+
+
+  METHOD resolve_group_jobs.
+    DATA lt_used_jobs TYPE SORTED TABLE OF sysuuid_x16 WITH UNIQUE KEY table_line.
+    DATA lt_used_keys TYPE tt_source_key.
+
+    LOOP AT it_groups INTO DATA(ls_group).
+      DATA(lv_job_uuid) = find_group_job( ls_group ).
+      LOOP AT ls_group-source_rows INTO DATA(ls_source).
+        DATA(ls_key) = build_source_key( ls_source ).
+        INSERT ls_key INTO TABLE lt_used_keys.
+        IF sy-subrc <> 0.
+          RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+            EXPORTING iv_text = |La riga MTE { ls_source-vbeln }/{ ls_source-posnr } compare in piu gruppi: verificare la chiave sorgente prima del retry.|.
+        ENDIF.
+      ENDLOOP.
+      IF lv_job_uuid IS NOT INITIAL.
+        INSERT lv_job_uuid INTO TABLE lt_used_jobs.
+        IF sy-subrc <> 0.
+          RAISE EXCEPTION TYPE /eacm/cx_eacm_posting
+            EXPORTING iv_text = |La richiesta MTE { lv_job_uuid } appartiene a piu gruppi: ripristinare il raggruppamento originale prima del retry.|.
+        ENDIF.
+      ENDIF.
+      APPEND lv_job_uuid TO rt_jobs.
+    ENDLOOP.
   ENDMETHOD.
 
 
@@ -2029,7 +2210,10 @@ CLASS /eacm/cl_mte_posting IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-ENDCLASS.
+
+  ENDCLASS.
+
+
 
 
 

@@ -265,7 +265,6 @@ ENDMETHOD.
 
 METHOD PostMteDirect.
   DATA(lo_posting) = NEW /eacm/cl_mte_posting( ).
-  DATA lv_batch_active TYPE abap_bool.
 
   LOOP AT keys ASSIGNING FIELD-SYMBOL(<key>).
     DATA(ls_selection) = build_selection(
@@ -275,55 +274,37 @@ METHOD PostMteDirect.
     DATA lt_posting_result TYPE /eacm/cl_mte_posting=>tt_result.
     CLEAR lt_posting_result.
 
-    IF ls_selection-test_run <> abap_true.
-      CLEAR lv_batch_active.
-      SELECT SINGLE @abap_true
-        FROM /eacm/job_mte
-        WHERE bukrs = @ls_selection-company_code
-          AND ( status = 'I' OR status = 'W' )
-        INTO @lv_batch_active.
-
-      IF lv_batch_active = abap_true.
+    TRY.
+        IF ls_selection-test_run = abap_true.
+          lt_posting_result = lo_posting->run( ls_selection ).
+        ELSE.
+          DATA(lv_direct_count) =
+            /eacm/cl_mte_posting_request=>enqueue( ls_selection ).
+          DATA(lv_direct_message) = COND string(
+            WHEN lv_direct_count > 0
+            THEN |Richieste MTE accodate: { lv_direct_count }. Esito e documenti in JOB_MTE.|
+            ELSE 'Nessuna richiesta MTE da contabilizzare: righe gia contabilizzate o in elaborazione.' ).
+          APPEND VALUE #(
+            %cid = <key>-%cid
+            %msg = new_message_with_text(
+              severity = if_abap_behv_message=>severity-information
+              text     = lv_direct_message ) ) TO reported-/eacm/i_contmte.
+          APPEND VALUE #(
+            %cid = <key>-%cid
+            %param = VALUE #(
+              Preview      = abap_false
+              MessageType  = COND #( WHEN lv_direct_count > 0 THEN 'I' ELSE 'W' )
+              MessageText  = lv_direct_message
+              PostedRows   = 0
+              ErrorCount   = 0
+              WarningCount = 0 ) ) TO result.
+          CONTINUE.
+        ENDIF.
+      CATCH cx_root INTO DATA(lx_posting).
         APPEND VALUE #(
           type = 'E'
-          message_text = 'Job MTE in attesa o in esecuzione per la societa: attendere la fine prima della contabilizzazione diretta.' )
-          TO lt_posting_result.
-      ENDIF.
-    ENDIF.
-
-    IF lt_posting_result IS INITIAL.
-      TRY.
-          IF ls_selection-test_run = abap_true.
-            lt_posting_result = lo_posting->run( ls_selection ).
-          ELSE.
-            DATA(lv_direct_count) =
-              /eacm/cl_mte_posting_request=>enqueue_direct( ls_selection ).
-            DATA(lv_direct_message) = COND string(
-              WHEN lv_direct_count > 0
-              THEN |Contabilizzazione diretta MTE richiesta per { lv_direct_count } gruppi. Esito e documenti in JOB_MTE.|
-              ELSE 'Nessuna richiesta MTE da contabilizzare: righe gia contabilizzate o in elaborazione.' ).
-            APPEND VALUE #(
-              %cid = <key>-%cid
-              %msg = new_message_with_text(
-                severity = if_abap_behv_message=>severity-information
-                text     = lv_direct_message ) ) TO reported-/eacm/i_contmte.
-            APPEND VALUE #(
-              %cid = <key>-%cid
-              %param = VALUE #(
-                Preview      = abap_false
-                MessageType  = COND #( WHEN lv_direct_count > 0 THEN 'I' ELSE 'W' )
-                MessageText  = lv_direct_message
-                PostedRows   = 0
-                ErrorCount   = 0
-                WarningCount = 0 ) ) TO result.
-            CONTINUE.
-          ENDIF.
-        CATCH cx_root INTO DATA(lx_posting).
-          APPEND VALUE #(
-            type = 'E'
-            message_text = format_exception( lx_posting ) ) TO lt_posting_result.
-      ENDTRY.
-    ENDIF.
+          message_text = format_exception( lx_posting ) ) TO lt_posting_result.
+    ENDTRY.
 
     DATA(lv_message_type) = COND symsgty(
       WHEN line_exists( lt_posting_result[ type = 'E' ] )
@@ -372,6 +353,10 @@ METHOD PostMteDirect.
       THEN |Contabilizzazione MTE diretta completata: { lv_success_count } righe aggiornate.|
       ELSE 'Nessuna provvigione MTE contabilizzata.' ).
 
+    IF lv_message_type = 'E'.
+      APPEND VALUE #( %cid = <key>-%cid ) TO failed-/eacm/i_contmte.
+    ENDIF.
+
     APPEND VALUE #(
       %cid = <key>-%cid
       %param = VALUE #(
@@ -411,18 +396,7 @@ CLASS lsc_I_CONTMTE IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD save.
-    DATA(lt_direct_result) = /eacm/cl_mte_posting_request=>save_pending( ).
-    LOOP AT lt_direct_result INTO DATA(ls_direct_result).
-      " Gli errori del singolo documento rimangono in JOB_MTE. Qui si
-      " comunica l'esito senza invalidare il salvataggio dello storico.
-      APPEND VALUE #(
-        %msg = new_message_with_text(
-          severity = COND #(
-            WHEN ls_direct_result-success = abap_true
-            THEN if_abap_behv_message=>severity-success
-            ELSE if_abap_behv_message=>severity-information )
-          text = ls_direct_result-message_text ) ) TO reported-/eacm/i_contmte.
-    ENDLOOP.
+    /eacm/cl_mte_posting_request=>save_pending( ).
   ENDMETHOD.
 
   METHOD cleanup.

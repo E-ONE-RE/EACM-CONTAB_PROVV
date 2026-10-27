@@ -1,34 +1,69 @@
 @Metadata.allowExtensions: true
 @Metadata.ignorePropagatedAnnotations: true
-@Endusertext: {
-  Label: '###GENERATED Core Data Service Entity'
+@EndUserText: {
+  label: '###GENERATED Core Data Service Entity'
 }
-@Objectmodel: {
-  Sapobjectnodetype.Name: '/EACM/JOB_MDE'
+@ObjectModel: {
+  sapObjectNodeType.name: '/EACM/JOB_MDE'
 }
 @AccessControl.authorizationCheck: #MANDATORY
 define root view entity /EACM/C_JOB_MDE
-  provider contract TRANSACTIONAL_QUERY
+  provider contract transactional_query
   as projection on /EACM/R_JOB_MDE
-  association [1..1] to /EACM/R_JOB_MDE as _BaseEntity on $projection.JOBUUID = _BaseEntity.JOBUUID
+  association [1..1] to /EACM/R_JOB_MDE as _BaseEntity on $projection.JobUUID = _BaseEntity.JobUUID
 {
+  
   key JobUUID,
+
   Status,
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: '/EACM/R_T001',
+      element: 'Bukrs'
+    }
+  }]
   Bukrs,
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: '/EACM/I_TVKO',
+      element: 'Vkorg'
+    }
+  }]
   Vkorg,
+
   Vtweg,
+
   Zclpr,
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: '/EACM/I_ZPRAA',
+      element: 'Zcdaz'
+    }
+  }]
   Zcdaz,
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: '/EACM/I_ZPR02',
+      element: 'Ztpag'
+    }
+  }]
   Ztpag,
-  @Consumption: {
-    Valuehelpdefinition: [ {
-      Entity.Element: 'Currency', 
-      Entity.Name: 'I_CurrencyStdVH', 
-      Useforvalidation: true
-    } ]
-  }
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: 'I_CurrencyStdVH',
+      element: 'Currency'
+    },
+    useForValidation: true
+  }]
   Waers,
+
   Lifnr,
+
   Bldat,
   Budat,
   Blart,
@@ -52,19 +87,19 @@ define root view entity /EACM/C_JOB_MDE
   Belnr,
   BelnrGjahr,
   @Semantics: {
-    User.Createdby: true
+    user.createdBy: true
   }
   CreatedBy,
   @Semantics: {
-    Systemdatetime.Createdat: true
+    systemDateTime.createdAt: true
   }
   CreatedAt,
   @Semantics: {
-    User.Lastchangedby: true
+    user.lastChangedBy: true
   }
   ChangedBy,
   @Semantics: {
-    Systemdatetime.Lastchangedat: true
+    systemDateTime.lastChangedAt: true
   }
   ChangedAt,
   LastMessage,

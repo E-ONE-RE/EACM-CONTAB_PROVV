@@ -29,7 +29,7 @@ CLASS /EACM/CL_MTE_POSTING_APJ IMPLEMENTATION.
       FROM /eacm/job_mte
       WHERE status = 'I'
          OR status = 'W'
-         OR status = 'E'
+*         OR status = 'E'
       INTO @DATA(lv_more_requests).
 
     IF lv_more_requests = abap_true.
@@ -37,8 +37,12 @@ CLASS /EACM/CL_MTE_POSTING_APJ IMPLEMENTATION.
           /eacm/cl_mte_posting_request=>schedule_processing_job(
             iv_delay_seconds = 30 ).
         CATCH /eacm/cx_eacm_posting INTO DATA(lx_schedule).
-          RAISE EXCEPTION TYPE cx_apj_rt_content
-            USING MESSAGE
+*          DATA(lv_schedule_text) = lx_schedule->get_text( ).
+*          MESSAGE ID '00' TYPE 'E' NUMBER '398'
+*            WITH lv_schedule_text
+*            INTO DATA(lv_schedule_message).
+            RAISE EXCEPTION TYPE cx_apj_rt_content
+*            USING MESSAGE
             EXPORTING previous = lx_schedule.
       ENDTRY.
     ENDIF.

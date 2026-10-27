@@ -1,14 +1,14 @@
 {
   "formatVersion": "2",
   "header": {
-    "description": "{{appDescription}}",
+    "description": "Accounting Job Maturande",
     "originalLanguage": "en",
     "abapLanguageVersion": "cloudDevelopment"
   },
   "generalInformation": {
     "appType": "ui5",
     "catalogId": "SAP_TC_UI5_REPO_UIAD",
-    "targetMappingTitle": "Job contabilizzazione Maturande"
+    "targetMappingTitle": "Accounting Job Maturande"
   },
   "ui5AppDetails": {
     "appId": "eacm.job_mde"
@@ -27,7 +27,7 @@
       "tileType": "static",
       "isDefault": true,
       "standard": {
-        "title": "Job contabilizzazione Maturande"
+        "title": "Accounting Job Maturande"
       }
     }
   ]

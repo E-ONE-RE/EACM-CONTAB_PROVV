@@ -18,13 +18,7 @@ CLASS /eacm/cl_mte_posting_request DEFINITION
       RETURNING VALUE(rv_count) TYPE i
       RAISING /eacm/cx_eacm_posting.
 
-    CLASS-METHODS enqueue_direct
-      IMPORTING is_selection TYPE /eacm/cl_mte_posting=>ty_selection
-      RETURNING VALUE(rv_count) TYPE i
-      RAISING /eacm/cx_eacm_posting.
-
-    CLASS-METHODS save_pending
-      RETURNING VALUE(rt_direct_result) TYPE /eacm/cl_mte_posting=>tt_result.
+    CLASS-METHODS save_pending.
     CLASS-METHODS clear_pending.
 
     CLASS-METHODS schedule_processing_job
@@ -35,7 +29,6 @@ CLASS /eacm/cl_mte_posting_request DEFINITION
 protected section.
   PRIVATE SECTION.
     CLASS-DATA gt_pending_selection TYPE tt_selection.
-    CLASS-DATA gt_pending_direct TYPE tt_selection.
 ENDCLASS.
 
 
@@ -51,24 +44,14 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD enqueue_direct.
-    rv_count = NEW /eacm/cl_mte_posting( )->count_status_requests( is_selection ).
-    IF rv_count > 0.
-      APPEND is_selection TO gt_pending_direct.
-    ENDIF.
-  ENDMETHOD.
-
-
   METHOD save_pending.
     DATA lt_pending_selection TYPE tt_selection.
-    DATA lt_pending_direct TYPE tt_selection.
     DATA lv_enqueued_count TYPE i.
     DATA lv_message TYPE string.
+    DATA lv_phase TYPE string VALUE 'Creazione richieste MTE'.
 
     lt_pending_selection = gt_pending_selection.
-    lt_pending_direct = gt_pending_direct.
     CLEAR gt_pending_selection.
-    CLEAR gt_pending_direct.
 
     IF lt_pending_selection IS NOT INITIAL.
       TRY.
@@ -77,6 +60,7 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
         ENDLOOP.
 
         IF lv_enqueued_count > 0.
+          lv_phase = 'Pianificazione Application Job MTE'.
           DATA(ls_schedule) = schedule_processing_job( iv_delay_seconds = 30 ).
           lv_message = |Application Job MTE schedulato: { ls_schedule-jobname }/{ ls_schedule-jobcount }|.
 
@@ -89,6 +73,16 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
 
       CATCH cx_root INTO DATA(lx_error).
         lv_message = lx_error->get_text( ).
+        IF lv_message IS INITIAL OR lv_message = 'An exception was raised.'.
+          DATA(lo_previous) = lx_error->previous.
+          IF lo_previous IS BOUND.
+            lv_message = lo_previous->get_text( ).
+          ENDIF.
+        ENDIF.
+        lv_message = |{ lv_phase }: { lv_message }|.
+        IF strlen( lv_message ) > 500.
+          lv_message = substring( val = lv_message off = 0 len = 497 ) && `...`.
+        ENDIF.
         LOOP AT lt_pending_selection INTO ls_selection.
           NEW /eacm/cl_mte_posting( )->update_status_schedule_message(
             is_selection = ls_selection
@@ -98,24 +92,11 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
       ENDTRY.
     ENDIF.
 
-    " La chiamata diretta resta nella stessa richiesta RAP, ma le scritture
-    " e la chiamata di contabilizzazione avvengono nella save sequence.
-    LOOP AT lt_pending_direct INTO DATA(ls_direct_selection).
-      TRY.
-          DATA(lt_result) = NEW /eacm/cl_mte_posting( )->run_direct( ls_direct_selection ).
-          APPEND LINES OF lt_result TO rt_direct_result.
-        CATCH cx_root INTO DATA(lx_direct_error).
-          APPEND VALUE #(
-            type         = 'E'
-            message_text = lx_direct_error->get_text( ) ) TO rt_direct_result.
-      ENDTRY.
-    ENDLOOP.
   ENDMETHOD.
 
 
   METHOD clear_pending.
     CLEAR gt_pending_selection.
-    CLEAR gt_pending_direct.
   ENDMETHOD.
 
 
@@ -148,4 +129,6 @@ CLASS /EACM/CL_MTE_POSTING_REQUEST IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 ENDCLASS.
+
+
 

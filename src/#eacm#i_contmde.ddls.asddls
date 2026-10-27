@@ -1,6 +1,6 @@
 @AbapCatalog.viewEnhancementCategory: [#NONE]
 @AccessControl.authorizationCheck: #NOT_REQUIRED
-@EndUserText.label: 'Stanziamenti provvigioni agenti'
+@EndUserText.label: 'Agent Commission Accruals'
 @Metadata.ignorePropagatedAnnotations: true
 define root view entity /EACM/I_CONTMDE 
   as select from /eacm/prdo as Prdo

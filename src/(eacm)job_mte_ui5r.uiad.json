@@ -1,8 +1,8 @@
 {
   "formatVersion": "2",
   "header": {
-    "description": "{{appDescription}}",
-    "originalLanguage": "en",
+    "description": "Job contabilizzazione Maturate",
+    "originalLanguage": "it",
     "abapLanguageVersion": "cloudDevelopment"
   },
   "generalInformation": {

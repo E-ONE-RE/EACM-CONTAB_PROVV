@@ -1,7 +1,7 @@
 @Metadata.allowExtensions: true
 @Metadata.ignorePropagatedAnnotations: true
 @EndUserText: {
-  label: 'Stanziamenti provvigioni agenti'
+  label: 'Agent Commission Accrual'
 }
 @AccessControl.authorizationCheck: #MANDATORY
 define root view entity /EACM/C_CONTMDE

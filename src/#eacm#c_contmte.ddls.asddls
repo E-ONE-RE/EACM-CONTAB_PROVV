@@ -1,185 +1,185 @@
 @Metadata.allowExtensions: true
 @Metadata.ignorePropagatedAnnotations: true
-@Endusertext: {
-  Label: 'Maturate Contabilizzate'
+@EndUserText: {
+  label: 'Posted Commission Accrual'
 }
 @AccessControl.authorizationCheck: #MANDATORY
 define root view entity /EACM/C_CONTMTE
-  provider contract TRANSACTIONAL_QUERY
+  provider contract transactional_query
   as projection on /EACM/I_CONTMTE
-  association [1..1] to /EACM/I_CONTMTE as _BaseEntity on $projection.COMPANYCODE = _BaseEntity.COMPANYCODE and $projection.SALESORGANIZATION = _BaseEntity.SALESORGANIZATION and $projection.DISTRIBUTIONCHANNEL = _BaseEntity.DISTRIBUTIONCHANNEL and $projection.COMMISSIONCLASS = _BaseEntity.COMMISSIONCLASS and $projection.BILLINGDOCUMENT = _BaseEntity.BILLINGDOCUMENT and $projection.BILLINGDOCUMENTITEM = _BaseEntity.BILLINGDOCUMENTITEM and $projection.AGENT = _BaseEntity.AGENT and $projection.AGENTPROGRESSIVE = _BaseEntity.AGENTPROGRESSIVE and $projection.FACSIMILEPROGRESSIVE = _BaseEntity.FACSIMILEPROGRESSIVE and $projection.FACSIMILEPERIOD = _BaseEntity.FACSIMILEPERIOD
+  association [1..1] to /EACM/I_CONTMTE as _BaseEntity on $projection.CompanyCode = _BaseEntity.CompanyCode and $projection.SalesOrganization = _BaseEntity.SalesOrganization and $projection.DistributionChannel = _BaseEntity.DistributionChannel and $projection.CommissionClass = _BaseEntity.CommissionClass and $projection.BillingDocument = _BaseEntity.BillingDocument and $projection.BillingDocumentItem = _BaseEntity.BillingDocumentItem and $projection.Agent = _BaseEntity.Agent and $projection.AgentProgressive = _BaseEntity.AgentProgressive and $projection.FacsimileProgressive = _BaseEntity.FacsimileProgressive and $projection.FacsimilePeriod = _BaseEntity.FacsimilePeriod
 {
-  @Endusertext: {
-    Label: 'Company Code', 
-    Quickinfo: 'Company Code'
+  @EndUserText: {
+    label: 'Company Code', 
+    quickInfo: 'Company Code'
   }
   key CompanyCode,
-  @Endusertext: {
-    Label: 'Sales Organization', 
-    Quickinfo: 'Sales Organization'
+  @EndUserText: {
+    label: 'Sales Organization', 
+    quickInfo: 'Sales Organization'
   }
   key SalesOrganization,
-  @Endusertext: {
-    Label: 'Distribution Channel', 
-    Quickinfo: 'Distribution Channel'
+  @EndUserText: {
+    label: 'Distribution Channel', 
+    quickInfo: 'Distribution Channel'
   }
   key DistributionChannel,
-  @Endusertext: {
-    Label: 'Cod.class.comm.', 
-    Quickinfo: 'Code classification commissions'
+  @EndUserText: {
+    label: 'Cod.class.comm.', 
+    quickInfo: 'Code classification commissions'
   }
   key CommissionClass,
-  @Endusertext: {
-    Label: 'SD Document', 
-    Quickinfo: 'Sales and Distribution Document Number'
+  @EndUserText: {
+    label: 'SD Document', 
+    quickInfo: 'Sales and Distribution Document Number'
   }
   key BillingDocument,
-  @Endusertext: {
-    Label: 'Item (SD)', 
-    Quickinfo: 'Item number of the SD document'
+  @EndUserText: {
+    label: 'Item (SD)', 
+    quickInfo: 'Item number of the SD document'
   }
   key BillingDocumentItem,
-  @Endusertext: {
-    Label: 'Agent Code', 
-    Quickinfo: 'Agent Code'
+  @EndUserText: {
+    label: 'Agent Code', 
+    quickInfo: 'Agent Code'
   }
   key Agent,
-  @Endusertext: {
-    Label: 'Prog.n.agent', 
-    Quickinfo: 'Progressive number agent'
+  @EndUserText: {
+    label: 'Prog.n.agent', 
+    quickInfo: 'Progressive number agent'
   }
   key AgentProgressive,
-  @Endusertext: {
-    Label: 'Facsimile number', 
-    Quickinfo: 'Facsimile number'
+  @EndUserText: {
+    label: 'Facsimile number', 
+    quickInfo: 'Facsimile number'
   }
   key FacsimileProgressive,
-  @Endusertext: {
-    Label: 'YYYYMM competence', 
-    Quickinfo: 'YYYYMM competence facsimile'
+  @EndUserText: {
+    label: 'YYYYMM competence', 
+    quickInfo: 'YYYYMM competence facsimile'
   }
   key FacsimilePeriod,
-  @Endusertext: {
-    Label: 'Record state', 
-    Quickinfo: 'Record state'
+  @EndUserText: {
+    label: 'Record state', 
+    quickInfo: 'Record state'
   }
   ProcessingStatus,
-  @Endusertext: {
-    Label: 'Dt fac-sim print', 
-    Quickinfo: 'Date of fac-simile print'
+  @EndUserText: {
+    label: 'Dt fac-sim print', 
+    quickInfo: 'Date of fac-simile print'
   }
   FacsimileSettlementDate,
-  @Endusertext: {
-    Label: 'Posting Date', 
-    Quickinfo: 'Posting Date in the Document'
+  @EndUserText: {
+    label: 'Posting Date', 
+    quickInfo: 'Posting Date in the Document'
   }
   PostingDate,
-  @Endusertext: {
-    Label: 'Document Date', 
-    Quickinfo: 'Document Date in Document'
+  @EndUserText: {
+    label: 'Document Date', 
+    quickInfo: 'Document Date in Document'
   }
   MteDocumentDate,
-  @Endusertext: {
-    Label: 'Document Date', 
-    Quickinfo: 'Document Date in Document'
+  @EndUserText: {
+    label: 'Document Date', 
+    quickInfo: 'Document Date in Document'
   }
   BillingDocumentDate,
-  @Endusertext: {
-    Label: 'Agent type code', 
-    Quickinfo: 'Agent type code'
+  @EndUserText: {
+    label: 'Agent type code', 
+    quickInfo: 'Agent type code'
   }
   AgentPaymentType,
-  @Endusertext: {
-    Label: 'SD document categ.', 
-    Quickinfo: 'SD document category'
+  @EndUserText: {
+    label: 'SD document categ.', 
+    quickInfo: 'SD document category'
   }
   SalesDocumentCategory,
-  @Endusertext: {
-    Label: 'Exchange Rate Factor', 
-    Quickinfo: 'Exchange Rate Factor'
+  @EndUserText: {
+    label: 'Exchange Rate Factor', 
+    quickInfo: 'Exchange Rate Factor'
   }
   ExchangeRate,
-  @Endusertext: {
-    Label: 'Currency', 
-    Quickinfo: 'Currency Key'
+  @EndUserText: {
+    label: 'Currency', 
+    quickInfo: 'Currency Key'
   }
   TransactionCurrency,
-  @Endusertext: {
-    Label: 'Currency', 
-    Quickinfo: 'Currency Key'
+  @EndUserText: {
+    label: 'Currency', 
+    quickInfo: 'Currency Key'
   }
   CompanyCurrency,
-  @Endusertext: {
-    Label: 'Amount document (£)', 
-    Quickinfo: 'Amount document in £'
+  @EndUserText: {
+    label: 'Amount document (£)', 
+    quickInfo: 'Amount document in £'
   }
   @Semantics: {
-    Amount.Currencycode: 'TransactionCurrency'
+    amount.currencyCode: 'TransactionCurrency'
   }
   BillingNetAmount,
-  @Endusertext: {
-    Label: 'Max date', 
-    Quickinfo: 'Date time limit maximum'
+  @EndUserText: {
+    label: 'Max date', 
+    quickInfo: 'Date time limit maximum'
   }
   PaymentDueDate,
-  @Endusertext: {
-    Label: 'Tax.comm.', 
-    Quickinfo: 'Taxable commission'
+  @EndUserText: {
+    label: 'Tax.comm.', 
+    quickInfo: 'Taxable commission'
   }
   @Semantics: {
-    Amount.Currencycode: 'TransactionCurrency'
+    amount.currencyCode: 'TransactionCurrency'
   }
   PayableCommissionAmount,
-  @Endusertext: {
-    Label: 'Perc. commiss.', 
-    Quickinfo: 'Percentage commission'
+  @EndUserText: {
+    label: 'Perc. commiss.', 
+    quickInfo: 'Percentage commission'
   }
   CommissionPercentage,
-  @Endusertext: {
-    Label: 'Cod.class.comm.', 
-    Quickinfo: 'Code classification commissions'
+  @EndUserText: {
+    label: 'Cod.class.comm.', 
+    quickInfo: 'Code classification commissions'
   }
   SourceCommissionClass,
-  @Endusertext: {
-    Label: 'Comm.amount', 
-    Quickinfo: 'Commission amount'
+  @EndUserText: {
+    label: 'Comm.amount', 
+    quickInfo: 'Commission amount'
   }
   @Semantics: {
-    Amount.Currencycode: 'TransactionCurrency'
+    amount.currencyCode: 'TransactionCurrency'
   }
   AccruedCommissionAmount,
-  @Endusertext: {
-    Label: 'Date agent invoice', 
-    Quickinfo: 'Date of agent invoice'
+  @EndUserText: {
+    label: 'Date agent invoice', 
+    quickInfo: 'Date of agent invoice'
   }
   AgentInvoiceDate,
-  @Endusertext: {
-    Label: 'N.invoice ag.', 
-    Quickinfo: 'Number invoice agent'
+  @EndUserText: {
+    label: 'N.invoice ag.', 
+    quickInfo: 'Number invoice agent'
   }
   AgentInvoiceNumber,
-  @Endusertext: {
-    Label: 'Ex.invoice ag.', 
-    Quickinfo: 'Exercise invoice agent'
+  @EndUserText: {
+    label: 'Ex.invoice ag.', 
+    quickInfo: 'Exercise invoice agent'
   }
   AgentInvoiceFiscalYear,
-  @Endusertext: {
-    Label: 'dt acc ref ag inv', 
-    Quickinfo: 'date of accounting reference agent invoice'
+  @EndUserText: {
+    label: 'dt acc ref ag inv', 
+    quickInfo: 'date of accounting reference agent invoice'
   }
   AgentInvoiceRegistrationDate,
-  @Endusertext: {
-    Label: 'Sign document', 
-    Quickinfo: 'Sign of the document'
+  @EndUserText: {
+    label: 'Sign document', 
+    quickInfo: 'Sign of the document'
   }
   DocumentSign,
   @Semantics: {
-    Amount.Currencycode: 'TransactionCurrency'
+    amount.currencyCode: 'TransactionCurrency'
   }
   AccruedCommissionSigned,
-  @Endusertext: {
-    Label: 'Posted Today', 
-    Quickinfo: 'Contabilizzato oggi - boolean'
+  @EndUserText: {
+    label: 'Posted Today', 
+    quickInfo: 'Contabilizzato oggi - boolean'
   }
   IsToday,
   _BaseEntity

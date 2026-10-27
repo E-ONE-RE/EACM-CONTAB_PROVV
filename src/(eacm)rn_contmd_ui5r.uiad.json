@@ -1,17 +1,17 @@
 {
   "formatVersion": "2",
   "header": {
-    "description": "Contabilizzazione Maturande",
-    "originalLanguage": "en",
+    "description": "Contabilizzazione Provvigioni Maturande",
+    "originalLanguage": "it",
     "abapLanguageVersion": "cloudDevelopment"
   },
   "generalInformation": {
     "appType": "ui5",
     "catalogId": "SAP_TC_UI5_REPO_UIAD",
-    "targetMappingTitle": "Contabilizzazione Maturande"
+    "targetMappingTitle": "Contabilizzazione Provvigioni Maturande"
   },
   "ui5AppDetails": {
-    "appId": "zpd_contmde"
+    "appId": "zpdcontmde"
   },
   "navigation": {
     "targetMappingId": "/EACM/RN_CONTMD_UI5R_TM",
@@ -27,7 +27,7 @@
       "tileType": "static",
       "isDefault": true,
       "standard": {
-        "title": "Contabilizzazione Maturande"
+        "title": "Contabilizzazione Provvigioni Maturande"
       }
     }
   ]

@@ -10,24 +10,57 @@
 define root view entity /EACM/C_JOB_MTE
   provider contract transactional_query
   as projection on /EACM/R_JOB_MTE
-  association [1..1] to /EACM/R_JOB_MTE as _BaseEntity on $projection.JOBUUID = _BaseEntity.JOBUUID
+  association [1..1] to /EACM/R_JOB_MTE as _BaseEntity on $projection.JobUUID = _BaseEntity.JobUUID
 {
-  key JobUUID,
+key JobUUID,
+
   Status,
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: '/EACM/R_T001',
+      element: 'Bukrs'
+    }
+  }]
   Bukrs,
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: '/EACM/I_TVKO',
+      element: 'Vkorg'
+    }
+  }]
   Vkorg,
+
   Vtweg,
+
   Zclpr,
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: '/EACM/I_ZPRAA',
+      element: 'Zcdaz'
+    }
+  }]
   Zcdaz,
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: '/EACM/I_ZPR02',
+      element: 'Ztpag'
+    }
+  }]
   Ztpag,
-  @Consumption: {
-    valueHelpDefinition: [ {
-      entity.element: 'Currency', 
-      entity.name: 'I_CurrencyStdVH', 
-      useForValidation: true
-    } ]
-  }
+
+  @Consumption.valueHelpDefinition: [{
+    entity: {
+      name: 'I_CurrencyStdVH',
+      element: 'Currency'
+    },
+    useForValidation: true
+  }]
   Waers,
+
   Lifnr,
   Zamcf,
   Zidfs,

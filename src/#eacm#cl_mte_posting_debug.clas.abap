@@ -12,10 +12,11 @@ CLASS /eacm/cl_mte_posting_debug IMPLEMENTATION.
     " ATTENZIONE: contabilizzazione reale, non simulazione.
     " Usare dati di test senza job concorrenti sulla stessa coda.
     " Il worker seleziona la prima richiesta I/W per changed_at, created_at.
-    out->write( `Avvio worker MTE: massimo una richiesta in stato I/W.` ).
+    out->write( `Avvio worker MTE: massimo una richiesta in stato I/W/E.` ).
     NEW /eacm/cl_mte_posting_worker( )->run_pending(
-      iv_max_requests = 1 ).
+      iv_max_requests = 1
+       iv_retry_errors = abap_true ).
     out->write( `Worker terminato. Verificare STATUS e LAST_MESSAGE in /EACM/JOB_MTE.` ).
-    out->write( `Se non erano presenti richieste I/W, nessuna richiesta e stata elaborata.` ).
+    out->write( `Se non erano presenti richieste I/W/E, nessuna richiesta e stata elaborata.` ).
   ENDMETHOD.
 ENDCLASS.
